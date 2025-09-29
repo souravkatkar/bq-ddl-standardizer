@@ -124,39 +124,47 @@
                 <div class="tab-pane fade {% if active_tab == 'browse' %}show active{% endif %}" id="browse" role="tabpanel" aria-labelledby="browse-tab">
                     <form id="browseSourceForm" onsubmit="return false;">
                         <div class="row mt-3">
-                            <div class="col-md-4">
-                                <label for="browse_database" class="form-label">Database</label>
-                                {% if mysql_connected %}
-                                <select class="form-select" id="browse_database" name="browse_database" onchange="loadMysqlTables(); clearJsonSchema();">
-                                    <option value="">Select database...</option>
-                                    {% for db in mysql_dbs %}
-                                        <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
-                                    {% endfor %}
-                                </select>
-                                {% else %}
-                                <input type="text" class="form-control" id="browse_database" name="browse_database" placeholder="Enter database name">
-                                {% endif %}
-                            </div>
-                            {% if not mysql_connected %}
-                            <div class="col-md-4">
-                                <label for="browse_schema" class="form-label">Schema</label>
-                                <input type="text" class="form-control" id="browse_schema" name="browse_schema" placeholder="Enter schema name">
-                            </div>
+                            {% if db_system == "mysql" and mysql_connected %}
+                                <div class="col-md-6">
+                                    <label for="browse_database" class="form-label">Database</label>
+                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadMysqlTables(); clearJsonSchema();">
+                                        <option value="">Select database...</option>
+                                        {% for db in mysql_dbs %}
+                                            <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="browse_table" class="form-label">Table</label>
+                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();">
+                                        <option value="">Select table...</option>
+                                    </select>
+                                </div>
+                            {% elif db_system == "postgresql" and postgresql_connected %}
+                                <div class="col-md-4">
+                                    <label for="browse_database" class="form-label">Database</label>
+                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadPostgresSchemas(); clearJsonSchema();">
+                                        <option value="">Select database...</option>
+                                        {% for db in postgresql_dbs %}
+                                            <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="browse_schema" class="form-label">Schema</label>
+                                    <select class="form-select" id="browse_schema" name="browse_schema" onchange="loadPostgresTables(); clearJsonSchema();">
+                                        <option value="">Select schema...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="browse_table" class="form-label">Table</label>
+                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();">
+                                        <option value="">Select table...</option>
+                                    </select>
+                                </div>
                             {% endif %}
-                            <div class="col-md-4">
-                                <label for="browse_table" class="form-label">Select Table</label>
-                                {% if mysql_connected %}
-                                <select class="form-select mb-2" id="browse_table" name="browse_table" onchange="clearJsonSchema();">
-                                    <option value="">Select table...</option>
-                                </select>
-                                {% else %}
-                                <input type="text" class="form-control mb-2" id="browse_table" name="browse_table" placeholder="Enter table name">
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="row mt-2">
-                            <div class="col-md-12">
-                                <button type="button" class="btn btn-primary" style="width:auto;" onclick="getSchemaFromBrowse()">Get Schema</button>
+                            <div class="col-md-12 mt-2">
+                                <button type="button" class="btn btn-primary" onclick="getSchemaFromBrowse()">Get Schema</button>
                             </div>
                         </div>
                         <div class="row mt-4">
@@ -221,6 +229,47 @@ function loadMysqlTables() {
         });
 }
 
+function loadPostgresSchemas() {
+    const db = document.getElementById('browse_database').value;
+    if (!db) {
+        document.getElementById('browse_schema').innerHTML = '<option value="">Select schema...</option>';
+        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+        clearJsonSchema();
+        return;
+    }
+    fetch(`/get_postgres_schemas?database=${encodeURIComponent(db)}`)
+        .then(response => response.json())
+        .then(data => {
+            let options = '<option value="">Select schema...</option>';
+            for (const schema of data) {
+                options += `<option value="${schema}">${schema}</option>`;
+            }
+            document.getElementById('browse_schema').innerHTML = options;
+            document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+            clearJsonSchema();
+        });
+}
+
+function loadPostgresTables() {
+    const db = document.getElementById('browse_database').value;
+    const schema = document.getElementById('browse_schema').value;
+    if (!db || !schema) {
+        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+        clearJsonSchema();
+        return;
+    }
+    fetch(`/get_postgres_tables?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`)
+        .then(response => response.json())
+        .then(data => {
+            let options = '<option value="">Select table...</option>';
+            for (const tbl of data) {
+                options += `<option value="${tbl}">${tbl}</option>`;
+            }
+            document.getElementById('browse_table').innerHTML = options;
+            clearJsonSchema();
+        });
+}
+
 function clearJsonSchema() {
     document.getElementById('browse_json_schema').textContent = "";
     document.getElementById('generateDDLBtn').disabled = true;
@@ -251,20 +300,38 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 function getSchemaFromBrowse() {
+    const dbSystem = "{{ db_system }}";
     const db = document.getElementById('browse_database').value;
     const tbl = document.getElementById('browse_table').value;
-    if (!db || !tbl) {
-        alert("Please select both database and table.");
-        return;
+    if (dbSystem === "postgresql") {
+        const schema = document.getElementById('browse_schema').value;
+        if (!db || !schema || !tbl) {
+            alert("Please select database, schema, and table.");
+            return;
+        }
+        fetch(`/get_postgres_schema?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(tbl)}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
+                document.getElementById('bq_table_name_browse').value = data.schema.table_name || '';
+                document.getElementById('generateDDLBtn').disabled = false;
+                document.getElementById('bq_ddl_preview').style.display = 'none';
+            });
+    } else {
+        // MySQL
+        if (!db || !tbl) {
+            alert("Please select both database and table.");
+            return;
+        }
+        fetch(`/get_mysql_schema?database=${encodeURIComponent(db)}&table=${encodeURIComponent(tbl)}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
+                document.getElementById('bq_table_name_browse').value = data.schema.table_name || '';
+                document.getElementById('generateDDLBtn').disabled = false;
+                document.getElementById('bq_ddl_preview').style.display = 'none';
+            });
     }
-    fetch(`/get_mysql_schema?database=${encodeURIComponent(db)}&table=${encodeURIComponent(tbl)}`)
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
-            document.getElementById('bq_table_name_browse').value = data.schema.table_name || '';
-            document.getElementById('generateDDLBtn').disabled = false;
-            document.getElementById('bq_ddl_preview').style.display = 'none';
-        });
 }
 
 function generateDDLFromSchema() {
@@ -318,6 +385,50 @@ function clearTextarea(id) {
     if (id === "json_schema") {
         updateBQTableNameFromJSON();
     }
+}
+
+function onDatabaseChange() {
+    const dbSystem = "{{ db_system }}";
+    const db = document.getElementById('browse_database').value;
+    document.getElementById('browse_schema').innerHTML = '<option value="">Select schema...</option>';
+    document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+    clearJsonSchema();
+    if (!db) return;
+    fetch(`/get_schemas?db_system=${encodeURIComponent(dbSystem)}&database=${encodeURIComponent(db)}`)
+        .then(response => response.json())
+        .then(data => {
+            let options = '<option value="">Select schema...</option>';
+            for (const schema of data.schemas) {
+                options += `<option value="${schema}">${schema}</option>`;
+            }
+            document.getElementById('browse_schema').innerHTML = options;
+        });
+}
+
+function onSchemaChange() {
+    const dbSystem = "{{ db_system }}";
+    const db = document.getElementById('browse_database').value;
+    const schema = document.getElementById('browse_schema').value;
+    document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+    clearJsonSchema();
+    if (!db || !schema) return;
+    let url = "";
+    if (dbSystem === "postgresql") {
+        url = `/get_postgres_tables?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`;
+    } else {
+        url = `/get_tables?db_system=${encodeURIComponent(dbSystem)}&database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`;
+    }
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            let options = '<option value="">Select table...</option>';
+            // For /get_postgres_tables, data is a list; for /get_tables, data.tables
+            let tables = data.tables || data;
+            for (const tbl of tables) {
+                options += `<option value="${tbl}">${tbl}</option>`;
+            }
+            document.getElementById('browse_table').innerHTML = options;
+        });
 }
 </script>
 </body>

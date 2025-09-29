@@ -1,6 +1,13 @@
 from flask import Flask, render_template, request, url_for, flash, redirect, jsonify, session
 import json
 from src.renderer import generate_bq_ddl
+from src.mysql_conn import test_mysql_connection, get_mysql_tables, get_mysql_table_schema
+from src.postgres_conn import (
+    test_postgres_connection,
+    get_postgres_schemas,
+    get_postgres_tables,
+    get_postgres_table_schema
+)
 
 
 app = Flask(__name__)
@@ -111,7 +118,6 @@ DEFAULT_SOURCE_DDL = '''CREATE TABLE employees (
 
 @app.route('/', methods=['GET'])
 def home():
-    # Accept optional parameters for source system config fields
     db_system = request.args.get('db_system', '')
     host = request.args.get('host', '')
     port = request.args.get('port', '')
@@ -119,6 +125,8 @@ def home():
     database = request.args.get('database', '')
     mysql_connected = session.get('mysql_connected', False)
     mysql_dbs = session.get('mysql_dbs', [])
+    postgresql_connected = session.get('postgresql_connected', False)
+    postgresql_dbs = session.get('postgresql_dbs', [])
     active_tab = request.args.get('active_tab', 'manual')
     return render_template(
         'index.html',
@@ -134,6 +142,8 @@ def home():
         database=database,
         mysql_connected=mysql_connected,
         mysql_dbs=mysql_dbs,
+        postgresql_connected=postgresql_connected,
+        postgresql_dbs=postgresql_dbs,
         active_tab=active_tab
     )
 
@@ -192,47 +202,47 @@ def connect():
     password = request.form.get('password', '')
     database = request.form.get('database', '')
 
-    session['mysql_connected'] = False
-    session['mysql_dbs'] = []
-    # Store connection details in session (including password)
-    session['mysql_conn'] = {
-        'host': host,
-        'port': port,
-        'user': username,
-        'password': password
-    }
+    # Disconnect all source systems before connecting a new one
+    session.pop('mysql_connected', None)
+    session.pop('mysql_dbs', None)
+    session.pop('mysql_conn', None)
+    session.pop('postgresql_connected', None)
+    session.pop('postgresql_dbs', None)
+    session.pop('postgresql_conn', None)
 
     if db_system == "mysql":
         try:
-            import mysql.connector
-            conn = mysql.connector.connect(
-                host=host,
-                port=int(port),
-                user=username,
-                password=password
-            )
-            cursor = conn.cursor()
-            cursor.execute("SHOW DATABASES")
-            dbs = [row[0] for row in cursor.fetchall()]
-            cursor.close()
-            conn.close()
+            from src.mysql_conn import test_mysql_connection
+            dbs = test_mysql_connection(host, port, username, password)
             flash("MySQL connection successful!", "success")
             session['mysql_connected'] = True
             session['mysql_dbs'] = dbs
+            session['mysql_conn'] = {
+                'host': host,
+                'port': port,
+                'user': username,
+                'password': password
+            }
         except Exception as e:
             flash(f"MySQL connection failed: {e}", "danger")
     elif db_system == "postgresql":
-        flash("PostgreSQL connection not implemented yet.", "warning")
-    elif db_system == "sqlserver":
-        flash("SQL Server connection not implemented yet.", "warning")
-    elif db_system == "oracle":
-        flash("Oracle connection not implemented yet.", "warning")
-    elif db_system == "snowflake":
-        flash("Snowflake connection not implemented yet.", "warning")
+        try:
+            from src.postgres_conn import test_postgres_connection
+            dbs = test_postgres_connection(host, port, username, password)
+            flash("PostgreSQL connection successful!", "success")
+            session['postgresql_connected'] = True
+            session['postgresql_dbs'] = dbs
+            session['postgresql_conn'] = {
+                'host': host,
+                'port': port,
+                'user': username,
+                'password': password
+            }
+        except Exception as e:
+            flash(f"PostgreSQL connection failed: {e}", "danger")
     else:
-        flash("Please select a valid database system.", "warning")
+        flash("Only MySQL and PostgreSQL connections are implemented in this demo.", "warning")
 
-    # Redirect to Browse Source tab after connection
     return redirect(url_for(
         'home',
         db_system=db_system,
@@ -243,77 +253,67 @@ def connect():
         active_tab='browse'
     ))
 
-@app.route('/get_mysql_tables', methods=['GET'])
-def get_mysql_tables():
+# --- PostgreSQL AJAX endpoints ---
+
+@app.route('/get_postgres_schemas', methods=['GET'])
+def get_postgres_schemas_route():
     database = request.args.get('database', '')
-    tables = []
-    conn_details = session.get('mysql_conn')
+    conn_details = session.get('postgresql_conn')
+    schemas = []
     if conn_details and database:
         try:
-            import mysql.connector
-            conn = mysql.connector.connect(
-                host=conn_details['host'],
-                port=int(conn_details['port']),
-                user=conn_details['user'],
-                password=conn_details['password'],
-                database=database
+            schemas = get_postgres_schemas(
+                conn_details['host'],
+                conn_details['port'],
+                conn_details['user'],
+                conn_details['password'],
+                database
             )
-            cursor = conn.cursor()
-            cursor.execute("SHOW TABLES")
-            tables = [row[0] for row in cursor.fetchall()]
-            cursor.close()
-            conn.close()
+        except Exception:
+            schemas = []
+    return jsonify(schemas)
+
+@app.route('/get_postgres_tables', methods=['GET'])
+def get_postgres_tables_route():
+    database = request.args.get('database', '')
+    schema = request.args.get('schema', '')
+    conn_details = session.get('postgresql_conn')
+    tables = []
+    if conn_details and database and schema:
+        try:
+            tables = get_postgres_tables(
+                conn_details['host'],
+                conn_details['port'],
+                conn_details['user'],
+                conn_details['password'],
+                database,
+                schema
+            )
         except Exception:
             tables = []
     return jsonify(tables)
 
-@app.route('/get_mysql_schema')
-def get_mysql_schema():
+@app.route('/get_postgres_schema')
+def get_postgres_schema_route():
     database = request.args.get('database')
+    schema = request.args.get('schema')
     table = request.args.get('table')
-    conn_details = session.get('mysql_conn')
-    schema = {}
-    if conn_details and database and table:
+    conn_details = session.get('postgresql_conn')
+    schema_dict = {}
+    if conn_details and database and schema and table:
         try:
-            import mysql.connector
-            conn = mysql.connector.connect(
-                host=conn_details['host'],
-                port=int(conn_details['port']),
-                user=conn_details['user'],
-                password=conn_details['password'],
-                database=database
+            schema_dict = get_postgres_table_schema(
+                conn_details['host'],
+                conn_details['port'],
+                conn_details['user'],
+                conn_details['password'],
+                database,
+                schema,
+                table
             )
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE,
-                       COLUMN_DEFAULT, COLUMN_KEY, EXTRA, COLUMN_COMMENT
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
-                ORDER BY ORDINAL_POSITION
-            """, (database, table))
-            columns = []
-            for col in cursor.fetchall():
-                columns.append({
-                    "name": col[0],
-                    "type": col[1],
-                    "nullable": col[3].upper() == "YES",
-                    "comment": col[7] or ""
-                })
-            cursor.execute("SHOW TABLE STATUS WHERE Name = %s", (table,))
-            table_status = cursor.fetchone()
-            table_comment = table_status[17] if table_status else ""
-            schema = {
-                "table_name": table,
-                "columns": columns,
-                "db": database,
-                "schema": database,
-                "table_comment": table_comment
-            }
-            cursor.close()
-            conn.close()
         except Exception as e:
-            schema = {"error": str(e)}
-    return jsonify({"schema": schema})
+            schema_dict = {"error": str(e)}
+    return jsonify({"schema": schema_dict})
 
 @app.route('/generate_bq_ddl_from_schema', methods=['POST'])
 def generate_bq_ddl_from_schema():
@@ -325,6 +325,68 @@ def generate_bq_ddl_from_schema():
     dataset = f"{bq_project_id}.{bq_dataset_id}" if bq_project_id and bq_dataset_id else bq_dataset_id or schema.get("schema")
     ddl = generate_bq_ddl(bq_table_name, schema.get('columns', []), dataset, schema.get('table_comment'))
     return jsonify({"ddl": ddl})
+
+@app.route('/get_schemas')
+def get_schemas():
+    db_system = request.args.get('db_system')
+    database = request.args.get('database')
+    schemas = []
+    if db_system == "postgresql":
+        from src.postgres_conn import get_postgres_schemas
+        conn_details = session.get('postgresql_conn')
+        if conn_details and database:
+            try:
+                schemas = get_postgres_schemas(
+                    conn_details['host'],
+                    conn_details['port'],
+                    conn_details['user'],
+                    conn_details['password'],
+                    database
+                )
+            except Exception as e:
+                print("Error fetching schemas:", e)
+    # ...handle mysql if needed...
+    return jsonify({"schemas": schemas})
+
+@app.route('/get_mysql_tables', methods=['GET'])
+def get_mysql_tables_route():
+    database = request.args.get('database', '')
+    conn_details = session.get('mysql_conn')
+    tables = []
+    if conn_details and database:
+        try:
+            from src.mysql_conn import get_mysql_tables
+            tables = get_mysql_tables(
+                conn_details['host'],
+                conn_details['port'],
+                conn_details['user'],
+                conn_details['password'],
+                database
+            )
+        except Exception:
+            tables = []
+    return jsonify(tables)
+
+@app.route('/get_mysql_schema')
+def get_mysql_schema_route():
+    database = request.args.get('database')
+    table = request.args.get('table')
+    conn_details = session.get('mysql_conn')
+    schema = {}
+    if conn_details and database and table:
+        try:
+            from src.mysql_conn import get_mysql_table_schema
+            schema = get_mysql_table_schema(
+                conn_details['host'],
+                conn_details['port'],
+                conn_details['user'],
+                conn_details['password'],
+                database,
+                table
+            )
+        except Exception as e:
+            schema = {"error": str(e)}
+    return jsonify({"schema": schema})
 
 if __name__ == '__main__':
     app.run(debug=True)
