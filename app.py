@@ -1,5 +1,5 @@
-from flask import Flask, render_template, request, url_for, flash, redirect, jsonify, session
 import json
+from flask import Flask, render_template, request, url_for, flash, redirect, jsonify, session
 from src.renderer import generate_bq_ddl
 from src.mysql_conn import test_mysql_connection, get_mysql_tables, get_mysql_table_schema
 from src.postgres_conn import (
@@ -8,7 +8,12 @@ from src.postgres_conn import (
     get_postgres_tables,
     get_postgres_table_schema
 )
-
+from src.sqlserver_conn import (
+    test_sqlserver_connection,
+    get_sqlserver_schemas,
+    get_sqlserver_tables,
+    get_sqlserver_table_schema
+)
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"  # Needed for flash messages
@@ -118,33 +123,20 @@ DEFAULT_SOURCE_DDL = '''CREATE TABLE employees (
 
 @app.route('/', methods=['GET'])
 def home():
-    db_system = request.args.get('db_system', '')
-    host = request.args.get('host', '')
-    port = request.args.get('port', '')
-    username = request.args.get('username', '')
-    database = request.args.get('database', '')
-    mysql_connected = session.get('mysql_connected', False)
-    mysql_dbs = session.get('mysql_dbs', [])
-    postgresql_connected = session.get('postgresql_connected', False)
-    postgresql_dbs = session.get('postgresql_dbs', [])
-    active_tab = request.args.get('active_tab', 'manual')
     return render_template(
         'index.html',
-        ddl=None,
-        filename=None,
-        json_schema_text=DEFAULT_JSON_SCHEMA,
-        bq_table_name="employees",
-        source_ddl_text=DEFAULT_SOURCE_DDL,
-        db_system=db_system,
-        host=host,
-        port=port,
-        username=username,
-        database=database,
-        mysql_connected=mysql_connected,
-        mysql_dbs=mysql_dbs,
-        postgresql_connected=postgresql_connected,
-        postgresql_dbs=postgresql_dbs,
-        active_tab=active_tab
+        db_system=request.args.get('db_system', ''),
+        host=request.args.get('host', ''),
+        port=request.args.get('port', ''),
+        username=request.args.get('username', ''),
+        database=request.args.get('database', ''),
+        mysql_connected=session.get('mysql_connected', False),
+        mysql_dbs=session.get('mysql_dbs', []),
+        postgresql_connected=session.get('postgresql_connected', False),
+        postgresql_dbs=session.get('postgresql_dbs', []),
+        sqlserver_connected=session.get('sqlserver_connected', False),
+        sqlserver_dbs=session.get('sqlserver_dbs', []),
+        active_tab=request.args.get('active_tab', 'manual')
     )
 
 @app.route('/generate', methods=['POST'])
@@ -195,12 +187,14 @@ def generate():
 
 @app.route('/connect', methods=['POST'])
 def connect():
+    print("Received connection request")
     db_system = request.form.get('db_system', '')
     host = request.form.get('host', '')
     port = request.form.get('port', '')
     username = request.form.get('username', '')
     password = request.form.get('password', '')
     database = request.form.get('database', '')
+    print(f"db_system: {db_system}, host: {host}, port: {port}, username: {username}, database: {database}")
 
     # Disconnect all source systems before connecting a new one
     session.pop('mysql_connected', None)
@@ -209,11 +203,16 @@ def connect():
     session.pop('postgresql_connected', None)
     session.pop('postgresql_dbs', None)
     session.pop('postgresql_conn', None)
+    session.pop('sqlserver_connected', None)
+    session.pop('sqlserver_dbs', None)
+    session.pop('sqlserver_conn', None)
+    print("Cleared previous connections from session.")
 
     if db_system == "mysql":
+        print("Attempting MySQL connection...")
         try:
-            from src.mysql_conn import test_mysql_connection
             dbs = test_mysql_connection(host, port, username, password)
+            print(f"MySQL databases found: {dbs}")
             flash("MySQL connection successful!", "success")
             session['mysql_connected'] = True
             session['mysql_dbs'] = dbs
@@ -224,11 +223,13 @@ def connect():
                 'password': password
             }
         except Exception as e:
+            print(f"MySQL connection failed: {e}")
             flash(f"MySQL connection failed: {e}", "danger")
     elif db_system == "postgresql":
+        print("Attempting PostgreSQL connection...")
         try:
-            from src.postgres_conn import test_postgres_connection
             dbs = test_postgres_connection(host, port, username, password)
+            print(f"PostgreSQL databases found: {dbs}")
             flash("PostgreSQL connection successful!", "success")
             session['postgresql_connected'] = True
             session['postgresql_dbs'] = dbs
@@ -239,10 +240,30 @@ def connect():
                 'password': password
             }
         except Exception as e:
+            print(f"PostgreSQL connection failed: {e}")
             flash(f"PostgreSQL connection failed: {e}", "danger")
+    elif db_system == "sqlserver":
+        print("Attempting SQL Server connection...")
+        try:
+            dbs = test_sqlserver_connection(host, port, username, password)
+            print(f"SQL Server databases found: {dbs}")
+            flash("SQL Server connection successful!", "success")
+            session['sqlserver_connected'] = True
+            session['sqlserver_dbs'] = dbs
+            session['sqlserver_conn'] = {
+                'host': host,
+                'port': port,
+                'user': username,
+                'password': password
+            }
+        except Exception as e:
+            print(f"SQL Server connection failed: {e}")
+            flash(f"SQL Server connection failed: {e}", "danger")
     else:
-        flash("Only MySQL and PostgreSQL connections are implemented in this demo.", "warning")
+        print("Invalid DB system selected.")
+        flash("Only MySQL, PostgreSQL, and SQL Server connections are implemented.", "warning")
 
+    print("Redirecting to home with active_tab=browse")
     return redirect(url_for(
         'home',
         db_system=db_system,
@@ -257,8 +278,11 @@ def connect():
 
 @app.route('/get_postgres_schemas', methods=['GET'])
 def get_postgres_schemas_route():
+    print("Fetching PostgreSQL schemas...")
     database = request.args.get('database', '')
+    print(f"Requested database: {database}")
     conn_details = session.get('postgresql_conn')
+    print(f"PostgreSQL connection details from session: {conn_details}")
     schemas = []
     if conn_details and database:
         try:
@@ -269,15 +293,20 @@ def get_postgres_schemas_route():
                 conn_details['password'],
                 database
             )
-        except Exception:
+            print(f"Schemas found: {schemas}")
+        except Exception as e:
+            print(f"Error fetching PostgreSQL schemas: {e}")
             schemas = []
     return jsonify(schemas)
 
 @app.route('/get_postgres_tables', methods=['GET'])
 def get_postgres_tables_route():
+    print("Fetching PostgreSQL tables...")
     database = request.args.get('database', '')
     schema = request.args.get('schema', '')
+    print(f"Database: {database}, Schema: {schema}")
     conn_details = session.get('postgresql_conn')
+    print(f"PostgreSQL connection details from session: {conn_details}")
     tables = []
     if conn_details and database and schema:
         try:
@@ -289,16 +318,21 @@ def get_postgres_tables_route():
                 database,
                 schema
             )
-        except Exception:
+            print(f"Tables found: {tables}")
+        except Exception as e:
+            print(f"Error fetching PostgreSQL tables: {e}")
             tables = []
     return jsonify(tables)
 
 @app.route('/get_postgres_schema')
 def get_postgres_schema_route():
+    print("Fetching PostgreSQL table schema...")
     database = request.args.get('database')
     schema = request.args.get('schema')
     table = request.args.get('table')
+    print(f"Database: {database}, Schema: {schema}, Table: {table}")
     conn_details = session.get('postgresql_conn')
+    print(f"PostgreSQL connection details from session: {conn_details}")
     schema_dict = {}
     if conn_details and database and schema and table:
         try:
@@ -311,7 +345,9 @@ def get_postgres_schema_route():
                 schema,
                 table
             )
+            print(f"Schema found: {schema_dict}")
         except Exception as e:
+            print(f"Error fetching PostgreSQL schema: {e}")
             schema_dict = {"error": str(e)}
     return jsonify({"schema": schema_dict})
 
@@ -350,12 +386,14 @@ def get_schemas():
 
 @app.route('/get_mysql_tables', methods=['GET'])
 def get_mysql_tables_route():
+    print("Fetching MySQL tables...")
     database = request.args.get('database', '')
+    print(f"Requested database: {database}")
     conn_details = session.get('mysql_conn')
+    print(f"MySQL connection details from session: {conn_details}")
     tables = []
     if conn_details and database:
         try:
-            from src.mysql_conn import get_mysql_tables
             tables = get_mysql_tables(
                 conn_details['host'],
                 conn_details['port'],
@@ -363,19 +401,23 @@ def get_mysql_tables_route():
                 conn_details['password'],
                 database
             )
-        except Exception:
+            print(f"Tables found: {tables}")
+        except Exception as e:
+            print(f"Error fetching MySQL tables: {e}")
             tables = []
     return jsonify(tables)
 
 @app.route('/get_mysql_schema')
 def get_mysql_schema_route():
+    print("Fetching MySQL table schema...")
     database = request.args.get('database')
     table = request.args.get('table')
+    print(f"Database: {database}, Table: {table}")
     conn_details = session.get('mysql_conn')
+    print(f"MySQL connection details from session: {conn_details}")
     schema = {}
     if conn_details and database and table:
         try:
-            from src.mysql_conn import get_mysql_table_schema
             schema = get_mysql_table_schema(
                 conn_details['host'],
                 conn_details['port'],
@@ -384,9 +426,100 @@ def get_mysql_schema_route():
                 database,
                 table
             )
+            print(f"Schema found: {schema}")
         except Exception as e:
+            print(f"Error fetching MySQL schema: {e}")
             schema = {"error": str(e)}
     return jsonify({"schema": schema})
+
+@app.route('/get_sqlserver_schemas', methods=['GET'])
+def get_sqlserver_schemas_route():
+    print("Fetching SQL Server schemas...")
+    database = request.args.get('database', '')
+    print(f"Requested database: {database}")
+    conn_details = session.get('sqlserver_conn')
+    print(f"SQL Server connection details from session: {conn_details}")
+    schemas = []
+    if conn_details and database:
+        try:
+            schemas = get_sqlserver_schemas(
+                conn_details['host'],
+                conn_details['port'],
+                conn_details['user'],
+                conn_details['password'],
+                database
+            )
+            print(f"Schemas found: {schemas}")
+        except Exception as e:
+            print(f"Error fetching SQL Server schemas: {e}")
+            schemas = []
+    return jsonify(schemas)
+
+@app.route('/get_sqlserver_tables', methods=['GET'])
+def get_sqlserver_tables_route():
+    print("Fetching SQL Server tables...")
+    database = request.args.get('database', '')
+    schema = request.args.get('schema', '')
+    print(f"Database: {database}, Schema: {schema}")
+    conn_details = session.get('sqlserver_conn')
+    print(f"SQL Server connection details from session: {conn_details}")
+    tables = []
+    if conn_details and database and schema:
+        try:
+            tables = get_sqlserver_tables(
+                conn_details['host'],
+                conn_details['port'],
+                conn_details['user'],
+                conn_details['password'],
+                database,
+                schema
+            )
+            print(f"Tables found: {tables}")
+        except Exception as e:
+            print(f"Error fetching SQL Server tables: {e}")
+            tables = []
+    return jsonify(tables)
+
+@app.route('/get_sqlserver_schema')
+def get_sqlserver_schema_route():
+    print("Fetching SQL Server table schema...")
+    database = request.args.get('database')
+    schema = request.args.get('schema')
+    table = request.args.get('table')
+    print(f"Database: {database}, Schema: {schema}, Table: {table}")
+    conn_details = session.get('sqlserver_conn')
+    print(f"SQL Server connection details from session: {conn_details}")
+    schema_dict = {}
+    if conn_details and database and schema and table:
+        try:
+            schema_dict = get_sqlserver_table_schema(
+                conn_details['host'],
+                conn_details['port'],
+                conn_details['user'],
+                conn_details['password'],
+                database,
+                schema,
+                table
+            )
+            print(f"Schema found: {schema_dict}")
+        except Exception as e:
+            print(f"Error fetching SQL Server schema: {e}")
+            schema_dict = {"error": str(e)}
+    return jsonify({"schema": schema_dict})
+
+@app.route('/clear_connection', methods=['POST'])
+def clear_connection():
+    print("Clearing all source connections from session.")
+    session.pop('mysql_connected', None)
+    session.pop('mysql_dbs', None)
+    session.pop('mysql_conn', None)
+    session.pop('postgresql_connected', None)
+    session.pop('postgresql_dbs', None)
+    session.pop('postgresql_conn', None)
+    session.pop('sqlserver_connected', None)
+    session.pop('sqlserver_dbs', None)
+    session.pop('sqlserver_conn', None)
+    return ('', 204)
 
 if __name__ == '__main__':
     app.run(debug=True)

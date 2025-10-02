@@ -31,8 +31,10 @@
     <div class="row">
         <!-- Left Panel: Source System Connection -->
         <div class="col-md-4 left-panel border-end">
-            <h4 class="mb-3">Source System Connection</h4>
-            <form method="POST" action="/connect">
+            <div class="d-flex align-items-center mb-3">
+                <h5 class="me-3">Source Connection</h5>
+            </div>
+            <form id="sourceConnectionForm" method="POST" action="/connect" class="mb-4">
                 <div class="mb-3">
                     <label for="db_system" class="form-label">Database System</label>
                     <select class="form-select" id="db_system" name="db_system" required>
@@ -64,7 +66,10 @@
                     <label for="database" class="form-label">Database Name</label>
                     <input type="text" class="form-control" id="database" name="database" placeholder="Database Name" value="{{ database or '' }}">
                 </div>
-                <button type="submit" class="btn btn-primary w-100">Connect</button>
+                <div class="d-flex align-items-center mt-3">
+                    <button type="submit" class="btn btn-primary me-2">Connect</button>
+                    <button type="button" class="btn btn-secondary" onclick="clearSourceConnection()">Clear</button>
+                </div>
             </form>
         </div>
         <!-- Right Panel: Tabs -->
@@ -153,6 +158,28 @@
                                 <div class="col-md-4">
                                     <label for="browse_schema" class="form-label">Schema</label>
                                     <select class="form-select" id="browse_schema" name="browse_schema" onchange="loadPostgresTables(); clearJsonSchema();">
+                                        <option value="">Select schema...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="browse_table" class="form-label">Table</label>
+                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();">
+                                        <option value="">Select table...</option>
+                                    </select>
+                                </div>
+                            {% elif db_system == "sqlserver" and sqlserver_connected %}
+                                <div class="col-md-4">
+                                    <label for="browse_database" class="form-label">Database</label>
+                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadSqlServerSchemas(); clearJsonSchema();">
+                                        <option value="">Select database...</option>
+                                        {% for db in sqlserver_dbs %}
+                                            <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="browse_schema" class="form-label">Schema</label>
+                                    <select class="form-select" id="browse_schema" name="browse_schema" onchange="loadSqlServerTables(); clearJsonSchema();">
                                         <option value="">Select schema...</option>
                                     </select>
                                 </div>
@@ -270,6 +297,47 @@ function loadPostgresTables() {
         });
 }
 
+function loadSqlServerSchemas() {
+    const db = document.getElementById('browse_database').value;
+    if (!db) {
+        document.getElementById('browse_schema').innerHTML = '<option value="">Select schema...</option>';
+        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+        clearJsonSchema();
+        return;
+    }
+    fetch(`/get_sqlserver_schemas?database=${encodeURIComponent(db)}`)
+        .then(response => response.json())
+        .then(data => {
+            let options = '<option value="">Select schema...</option>';
+            for (const schema of data) {
+                options += `<option value="${schema}">${schema}</option>`;
+            }
+            document.getElementById('browse_schema').innerHTML = options;
+            document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+            clearJsonSchema();
+        });
+}
+
+function loadSqlServerTables() {
+    const db = document.getElementById('browse_database').value;
+    const schema = document.getElementById('browse_schema').value;
+    if (!db || !schema) {
+        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+        clearJsonSchema();
+        return;
+    }
+    fetch(`/get_sqlserver_tables?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`)
+        .then(response => response.json())
+        .then(data => {
+            let options = '<option value="">Select table...</option>';
+            for (const tbl of data) {
+                options += `<option value="${tbl}">${tbl}</option>`;
+            }
+            document.getElementById('browse_table').innerHTML = options;
+            clearJsonSchema();
+        });
+}
+
 function clearJsonSchema() {
     document.getElementById('browse_json_schema').textContent = "";
     document.getElementById('generateDDLBtn').disabled = true;
@@ -289,6 +357,10 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     {% if active_tab == 'browse' and mysql_connected and database %}
     loadMysqlTables();
+    {% elif active_tab == 'browse' and postgresql_connected and database %}
+    loadPostgresSchemas();
+    {% elif active_tab == 'browse' and sqlserver_connected and database %}
+    loadSqlServerSchemas();
     {% endif %}
     {% if active_tab == 'browse' %}
     var browseTab = document.getElementById('browse-tab');
@@ -310,6 +382,20 @@ function getSchemaFromBrowse() {
             return;
         }
         fetch(`/get_postgres_schema?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(tbl)}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
+                document.getElementById('bq_table_name_browse').value = data.schema.table_name || '';
+                document.getElementById('generateDDLBtn').disabled = false;
+                document.getElementById('bq_ddl_preview').style.display = 'none';
+            });
+    } else if (dbSystem === "sqlserver") {
+        const schema = document.getElementById('browse_schema').value;
+        if (!db || !schema || !tbl) {
+            alert("Please select database, schema, and table.");
+            return;
+        }
+        fetch(`/get_sqlserver_schema?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(tbl)}`)
             .then(response => response.json())
             .then(data => {
                 document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
@@ -429,6 +515,11 @@ function onSchemaChange() {
             }
             document.getElementById('browse_table').innerHTML = options;
         });
+}
+
+function clearSourceConnection() {
+    fetch('/clear_connection', {method: 'POST'})
+        .then(() => window.location.reload());
 }
 </script>
 </body>
