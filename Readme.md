@@ -3,8 +3,8 @@
 A simple **Flask** web application that:
 
 * Accepts source-database details from a web form.
-* Allows browsing of MySQL and PostgreSQL databases, schemas, and tables.
-* Extracts table schema from MySQL and PostgreSQL sources.
+* Allows browsing of MySQL, PostgreSQL, and SQL Server databases, schemas, and tables.
+* Extracts table schema from MySQL, PostgreSQL, and SQL Server sources.
 * Generates the equivalent **BigQuery CREATE TABLE DDL**.
 * Saves the generated SQL to a downloadable `.sql` file.
 
@@ -27,7 +27,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1   # (Windows PowerShell)
 
 # 2. Install dependencies
-pip install flask google-cloud-bigquery sqlalchemy mysql-connector-python psycopg2
+pip install flask google-cloud-bigquery sqlalchemy mysql-connector-python psycopg2 pyodbc
 
 # 3. Set the Flask app name (only needed once per terminal)
 set FLASK_APP=app.py
@@ -43,10 +43,10 @@ Now visit http://127.0.0.1:5000/ in your browser.
 
 ## Current Progress
 
-- **MySQL & PostgreSQL Source Support:**  
-  - Users can connect to either a MySQL or PostgreSQL database (only one at a time).
+- **MySQL, PostgreSQL & SQL Server Source Support:**  
+  - Users can connect to either a MySQL, PostgreSQL, or SQL Server database (only one at a time).
   - For MySQL: Users can browse databases and tables.
-  - For PostgreSQL: Users can browse databases, schemas, and tables.
+  - For PostgreSQL and SQL Server: Users can browse databases, schemas, and tables.
   - The app can extract schema from both JSON schema and source DDL.
   - Users can preview and edit the extracted schema before generating BigQuery DDL.
   - BigQuery DDL is generated using the extracted schema and user-provided project, dataset, and table name.
@@ -57,13 +57,13 @@ Now visit http://127.0.0.1:5000/ in your browser.
   - AJAX-based schema extraction and DDL generation for a smooth workflow.
   - Downloadable BigQuery DDL preview.
   - Only one source system connection is active at a time.
+  - "Clear" button to reset source connection details.
 
 ---
 
 ## Future Scope
 
 - **Support for Additional Source Systems:**
-  - SQL Server
   - Oracle
   - Snowflake
   - Other popular RDBMS and cloud data warehouses
