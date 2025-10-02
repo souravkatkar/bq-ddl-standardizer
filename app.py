@@ -187,14 +187,12 @@ def generate():
 
 @app.route('/connect', methods=['POST'])
 def connect():
-    print("Received connection request")
     db_system = request.form.get('db_system', '')
     host = request.form.get('host', '')
     port = request.form.get('port', '')
     username = request.form.get('username', '')
     password = request.form.get('password', '')
     database = request.form.get('database', '')
-    print(f"db_system: {db_system}, host: {host}, port: {port}, username: {username}, database: {database}")
 
     # Disconnect all source systems before connecting a new one
     session.pop('mysql_connected', None)
@@ -206,13 +204,12 @@ def connect():
     session.pop('sqlserver_connected', None)
     session.pop('sqlserver_dbs', None)
     session.pop('sqlserver_conn', None)
-    print("Cleared previous connections from session.")
+
+    connection_success = False
 
     if db_system == "mysql":
-        print("Attempting MySQL connection...")
         try:
             dbs = test_mysql_connection(host, port, username, password)
-            print(f"MySQL databases found: {dbs}")
             flash("MySQL connection successful!", "success")
             session['mysql_connected'] = True
             session['mysql_dbs'] = dbs
@@ -222,14 +219,12 @@ def connect():
                 'user': username,
                 'password': password
             }
+            connection_success = True
         except Exception as e:
-            print(f"MySQL connection failed: {e}")
             flash(f"MySQL connection failed: {e}", "danger")
     elif db_system == "postgresql":
-        print("Attempting PostgreSQL connection...")
         try:
             dbs = test_postgres_connection(host, port, username, password)
-            print(f"PostgreSQL databases found: {dbs}")
             flash("PostgreSQL connection successful!", "success")
             session['postgresql_connected'] = True
             session['postgresql_dbs'] = dbs
@@ -239,14 +234,12 @@ def connect():
                 'user': username,
                 'password': password
             }
+            connection_success = True
         except Exception as e:
-            print(f"PostgreSQL connection failed: {e}")
             flash(f"PostgreSQL connection failed: {e}", "danger")
     elif db_system == "sqlserver":
-        print("Attempting SQL Server connection...")
         try:
             dbs = test_sqlserver_connection(host, port, username, password)
-            print(f"SQL Server databases found: {dbs}")
             flash("SQL Server connection successful!", "success")
             session['sqlserver_connected'] = True
             session['sqlserver_dbs'] = dbs
@@ -256,23 +249,32 @@ def connect():
                 'user': username,
                 'password': password
             }
+            connection_success = True
         except Exception as e:
-            print(f"SQL Server connection failed: {e}")
             flash(f"SQL Server connection failed: {e}", "danger")
-    else:
-        print("Invalid DB system selected.")
-        flash("Only MySQL, PostgreSQL, and SQL Server connections are implemented.", "warning")
 
-    print("Redirecting to home with active_tab=browse")
-    return redirect(url_for(
-        'home',
-        db_system=db_system,
-        host=host,
-        port=port,
-        username=username,
-        database=database,
-        active_tab='browse'
-    ))
+    # Redirect to Manual tab on failure, Browse tab on success
+    if connection_success:
+        return redirect(url_for(
+            'home',
+            db_system=db_system,
+            host=host,
+            port=port,
+            username=username,
+            database=database,
+            active_tab='browse'
+        ))
+    else:
+        # Pass all fields except password
+        return redirect(url_for(
+            'home',
+            db_system=db_system,
+            host=host,
+            port=port,
+            username=username,
+            database=database,
+            active_tab='manual'
+        ))
 
 # --- PostgreSQL AJAX endpoints ---
 

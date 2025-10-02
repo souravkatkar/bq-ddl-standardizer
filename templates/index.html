@@ -65,15 +65,15 @@
                 </div>
                 <div class="mb-3">
                     <label for="host" class="form-label">Host</label>
-                    <input type="text" class="form-control" id="host" name="host" placeholder="e.g. localhost" value="{{ host or '' }}">
+                    <input type="text" class="form-control" id="host" name="host" placeholder="e.g. localhost" value="{{ host }}">
                 </div>
                 <div class="mb-3">
                     <label for="port" class="form-label">Port</label>
-                    <input type="text" class="form-control" id="port" name="port" placeholder="e.g. 3306" value="{{ port or '' }}">
+                    <input type="text" class="form-control" id="port" name="port" placeholder="e.g. 3306" value="{{ port }}">
                 </div>
                 <div class="mb-3">
                     <label for="username" class="form-label">Username</label>
-                    <input type="text" class="form-control" id="username" name="username" placeholder="Username" value="{{ username or '' }}">
+                    <input type="text" class="form-control" id="username" name="username" placeholder="Username" value="{{ username }}">
                 </div>
                 <div class="mb-3">
                     <label for="password" class="form-label">Password</label>
@@ -106,6 +106,7 @@
             <div class="tab-content" id="ddlTabContent">
                 <!-- Manual Tab -->
                 <div class="tab-pane fade {% if active_tab != 'browse' %}show active{% endif %}" id="manual" role="tabpanel" aria-labelledby="manual-tab">
+                    <div class="mt-4"></div> <!-- Add this for spacing below the tab headings -->
                     <form method="POST" action="/generate">
                         <div class="row">
                             <div class="col-md-6">
@@ -548,6 +549,17 @@ function onSchemaChange() {
 
 function clearConnectionForm() {
     document.getElementById('sourceConnectionForm').reset();
+    fetch('/clear_connection', {method: 'POST'})
+        .then(() => {
+            // Switch to Manual tab
+            var manualTab = document.getElementById('manual-tab');
+            if (manualTab) {
+                var tab = new bootstrap.Tab(manualTab);
+                tab.show();
+            }
+            // Remove query params and reload page to clear any state
+            window.location.href = window.location.pathname + '?active_tab=manual';
+        });
 }
 
 setTimeout(function() {
