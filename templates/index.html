@@ -54,13 +54,13 @@
             <form id="sourceConnectionForm" method="post" action="/connect" class="mb-4">
                 <div class="mb-3">
                     <label for="db_system" class="form-label">Database System</label>
-                    <select class="form-select" id="db_system" name="db_system" required>
-                        <option value="">Select...</option>
+                    <select name="db_system" class="form-select">
+                        <option value="" {% if not db_system %}selected{% endif %}>Select source system</option>
                         <option value="mysql" {% if db_system == "mysql" %}selected{% endif %}>MySQL</option>
                         <option value="postgresql" {% if db_system == "postgresql" %}selected{% endif %}>PostgreSQL</option>
                         <option value="sqlserver" {% if db_system == "sqlserver" %}selected{% endif %}>SQL Server</option>
-                        <option value="oracle" {% if db_system == "oracle" %}selected{% endif %}>Oracle</option>
-                        <option value="snowflake" {% if db_system == "snowflake" %}selected{% endif %}>Snowflake</option>
+                        <option value="oracle" disabled style="color: #888;">Oracle (coming soon)</option>
+                        <option value="snowflake" disabled style="color: #888;">Snowflake (coming soon)</option>
                     </select>
                 </div>
                 <div class="mb-3">
@@ -480,21 +480,32 @@ function generateDDLFromSchema() {
 
 function updateBQTableNameFromJSON() {
     try {
-        const jsonText = document.getElementById('json_schema').value;
-        if (jsonText.trim() === "") {
-            document.getElementById('bq_table_name').value = "";
-            return;
-        }
-        const schema = JSON.parse(jsonText);
-        if (schema.table_name !== undefined) {
-            document.getElementById('bq_table_name').value = schema.table_name;
-        } else {
-            document.getElementById('bq_table_name').value = "";
+        var jsonText = document.getElementById('json_schema').value;
+        var jsonObj = JSON.parse(jsonText);
+        if (jsonObj.table_name) {
+            document.getElementById('bq_table_name').value = jsonObj.table_name;
         }
     } catch (e) {
-        document.getElementById('bq_table_name').value = "";
+        // Ignore parse errors
     }
 }
+
+function updateBQTableNameFromDDL() {
+    var ddlText = document.getElementById('source_ddl').value;
+    var match = ddlText.match(/CREATE\s+TABLE\s+[`"]?(\w+)[`"]?/i);
+    if (match && match[1]) {
+        document.getElementById('bq_table_name').value = match[1];
+    }
+}
+
+// Optionally, call both on input
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('json_schema').addEventListener('input', updateBQTableNameFromJSON);
+    document.getElementById('source_ddl').addEventListener('input', updateBQTableNameFromDDL);
+    // Initial population
+    updateBQTableNameFromJSON();
+    updateBQTableNameFromDDL();
+});
 
 function clearTextarea(id) {
     document.getElementById(id).value = "";

@@ -136,7 +136,10 @@ def home():
         postgresql_dbs=session.get('postgresql_dbs', []),
         sqlserver_connected=session.get('sqlserver_connected', False),
         sqlserver_dbs=session.get('sqlserver_dbs', []),
-        active_tab=request.args.get('active_tab', 'manual')
+        active_tab=request.args.get('active_tab', 'manual'),
+        json_schema_text=request.args.get('json_schema_text', DEFAULT_JSON_SCHEMA),
+        source_ddl_text=request.args.get('source_ddl_text', DEFAULT_SOURCE_DDL),
+        bq_table_name=request.args.get('bq_table_name', '')
     )
 
 @app.route('/generate', methods=['POST'])
