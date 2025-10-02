@@ -36,28 +36,55 @@ set FLASK_ENV=development   # enables debug mode
 # 4. Start the development server
 flask run
 
-Now visit http://127.0.0.1:5000/ in your browser.
+# Now visit http://127.0.0.1:5000/ in your browser.
 ```
 
 ---
 
-## Current Progress
+## Project Structure
 
-- **MySQL, PostgreSQL & SQL Server Source Support:**  
-  - Users can connect to either a MySQL, PostgreSQL, or SQL Server database (only one at a time).
-  - For MySQL: Users can browse databases and tables.
-  - For PostgreSQL and SQL Server: Users can browse databases, schemas, and tables.
-  - The app can extract schema from both JSON schema and source DDL.
-  - Users can preview and edit the extracted schema before generating BigQuery DDL.
-  - BigQuery DDL is generated using the extracted schema and user-provided project, dataset, and table name.
-  - UI supports both manual schema/DDL input and interactive browsing of source systems.
+```
+bq-ddl-standardizer/
+│
+├── app.py
+├── src/
+│   ├── mysql_conn.py
+│   ├── postgres_conn.py
+│   ├── sqlserver_conn.py
+│   ├── renderer.py
+│   ├── mapping.py
+│   └── __init__.py
+├── templates/
+│   └── index.html
+├── static/
+│   └── js/
+│       └── main.js
+├── Readme.md
+```
+
+---
+
+## Features
+
+- **Source System Support:**  
+  - Connect to MySQL, PostgreSQL, or SQL Server (one at a time).
+  - Browse databases, schemas, and tables.
+  - Extract schema from JSON or source DDL.
+
+- **BigQuery DDL Generation:**  
+  - Preview and edit extracted schema.
+  - Generate BigQuery DDL using extracted schema and user-provided project, dataset, and table name.
+  - Downloadable BigQuery DDL preview.
 
 - **User Experience:**  
-  - Clean separation between Manual and Browse Source tabs.
-  - AJAX-based schema extraction and DDL generation for a smooth workflow.
-  - Downloadable BigQuery DDL preview.
+  - Manual and Browse Source tabs.
+  - AJAX-based schema extraction and DDL generation.
   - Only one source system connection is active at a time.
-  - "Clear" button to reset source connection details.
+  - "Clear" button resets source connection and UI.
+
+- **Accessibility:**  
+  - ARIA labels for form controls.
+  - Responsive Bootstrap UI.
 
 ---
 
@@ -83,4 +110,13 @@ Now visit http://127.0.0.1:5000/ in your browser.
 
 ---
 
-*Contributions and suggestions are welcome!*
+## Contributing
+
+Contributions and suggestions are welcome!  
+Feel free to open issues or submit pull requests.
+
+---
+
+## License
+
+MIT License
