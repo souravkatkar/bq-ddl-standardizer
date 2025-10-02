@@ -56,9 +56,6 @@ bq-ddl-standardizer/
 │   └── __init__.py
 ├── templates/
 │   └── index.html
-├── static/
-│   └── js/
-│       └── main.js
 ├── Readme.md
 ```
 
