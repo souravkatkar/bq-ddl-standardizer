@@ -27,6 +27,23 @@
     </style>
 </head>
 <body>
+<div aria-live="polite" aria-atomic="true" class="position-relative">
+  <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1080;">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% set category, message = messages[-1] %}
+        <div id="flashToast" class="toast align-items-center text-bg-{{ 'success' if category == 'success' else 'danger' if category == 'danger' else 'warning' }} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+          <div class="d-flex">
+            <div class="toast-body">
+              {{ message }}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+          </div>
+        </div>
+      {% endif %}
+    {% endwith %}
+  </div>
+</div>
 <div class="container-fluid mt-5">
     <div class="row">
         <!-- Left Panel: Source System Connection -->
@@ -34,7 +51,7 @@
             <div class="d-flex align-items-center mb-3">
                 <h5 class="me-3">Source Connection</h5>
             </div>
-            <form id="sourceConnectionForm" method="POST" action="/connect" class="mb-4">
+            <form id="sourceConnectionForm" method="post" action="/connect" class="mb-4">
                 <div class="mb-3">
                     <label for="db_system" class="form-label">Database System</label>
                     <select class="form-select" id="db_system" name="db_system" required>
@@ -62,13 +79,17 @@
                     <label for="password" class="form-label">Password</label>
                     <input type="password" class="form-control" id="password" name="password" placeholder="Password">
                 </div>
-                <div class="mb-3">
+                <!-- <div class="mb-3">
                     <label for="database" class="form-label">Database Name</label>
                     <input type="text" class="form-control" id="database" name="database" placeholder="Database Name" value="{{ database or '' }}">
-                </div>
-                <div class="d-flex align-items-center mt-3">
-                    <button type="submit" class="btn btn-primary me-2">Connect</button>
-                    <button type="button" class="btn btn-secondary" onclick="clearSourceConnection()">Clear</button>
+                </div> -->
+                <div class="row mt-3">
+                    <div class="col-6 pe-1">
+                        <button type="submit" class="btn btn-primary w-100">Connect</button>
+                    </div>
+                    <div class="col-6 ps-1">
+                        <button type="button" class="btn btn-primary w-100" onclick="clearConnectionForm()">Clear</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -232,6 +253,14 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+window.addEventListener('DOMContentLoaded', function() {
+    var toastEl = document.getElementById('flashToast');
+    if (toastEl) {
+        var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+        toast.show();
+    }
+});
+
 function loadMysqlTables() {
     const db = document.getElementById('browse_database').value;
     if (!db) {
@@ -517,10 +546,17 @@ function onSchemaChange() {
         });
 }
 
-function clearSourceConnection() {
-    fetch('/clear_connection', {method: 'POST'})
-        .then(() => window.location.reload());
+function clearConnectionForm() {
+    document.getElementById('sourceConnectionForm').reset();
 }
+
+setTimeout(function() {
+    var alert = document.querySelector('.alert');
+    if (alert) {
+        alert.classList.remove('show');
+        alert.classList.add('hide');
+    }
+}, 4000); // 4000 ms = 4 seconds
 </script>
 </body>
 </html>
