@@ -149,12 +149,18 @@
                 </div>
                 <!-- Browse Source Tab -->
                 <div class="tab-pane fade {% if active_tab == 'browse' %}show active{% endif %}" id="browse" role="tabpanel" aria-labelledby="browse-tab">
+                    {% set not_connected = not (mysql_connected or postgresql_connected or sqlserver_connected) %}
+                    {% if not_connected %}
+                        <div class="alert alert-warning mt-4" role="alert">
+                            <strong>Notice:</strong> Please connect to a source system before accessing the Browse section.
+                        </div>
+                    {% endif %}
                     <form id="browseSourceForm" onsubmit="return false;">
                         <div class="row mt-3">
-                            {% if db_system == "mysql" and mysql_connected %}
+                            {% if db_system == "mysql" %}
                                 <div class="col-md-6">
                                     <label for="browse_database" class="form-label">Database</label>
-                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadMysqlTables(); clearJsonSchema();">
+                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadMysqlTables(); clearJsonSchema();" {% if not mysql_connected %}disabled{% endif %}>
                                         <option value="">Select database...</option>
                                         {% for db in mysql_dbs %}
                                             <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
@@ -163,14 +169,14 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label for="browse_table" class="form-label">Table</label>
-                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();">
+                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();" {% if not mysql_connected %}disabled{% endif %}>
                                         <option value="">Select table...</option>
                                     </select>
                                 </div>
-                            {% elif db_system == "postgresql" and postgresql_connected %}
+                            {% elif db_system == "postgresql" %}
                                 <div class="col-md-4">
                                     <label for="browse_database" class="form-label">Database</label>
-                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadPostgresSchemas(); clearJsonSchema();">
+                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadPostgresSchemas(); clearJsonSchema();" {% if not postgresql_connected %}disabled{% endif %}>
                                         <option value="">Select database...</option>
                                         {% for db in postgresql_dbs %}
                                             <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
@@ -179,20 +185,20 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label for="browse_schema" class="form-label">Schema</label>
-                                    <select class="form-select" id="browse_schema" name="browse_schema" onchange="loadPostgresTables(); clearJsonSchema();">
+                                    <select class="form-select" id="browse_schema" name="browse_schema" onchange="loadPostgresTables(); clearJsonSchema();" {% if not postgresql_connected %}disabled{% endif %}>
                                         <option value="">Select schema...</option>
                                     </select>
                                 </div>
                                 <div class="col-md-4">
                                     <label for="browse_table" class="form-label">Table</label>
-                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();">
+                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();" {% if not postgresql_connected %}disabled{% endif %}>
                                         <option value="">Select table...</option>
                                     </select>
                                 </div>
-                            {% elif db_system == "sqlserver" and sqlserver_connected %}
+                            {% elif db_system == "sqlserver" %}
                                 <div class="col-md-4">
                                     <label for="browse_database" class="form-label">Database</label>
-                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadSqlServerSchemas(); clearJsonSchema();">
+                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadSqlServerSchemas(); clearJsonSchema();" {% if not sqlserver_connected %}disabled{% endif %}>
                                         <option value="">Select database...</option>
                                         {% for db in sqlserver_dbs %}
                                             <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
@@ -201,19 +207,19 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label for="browse_schema" class="form-label">Schema</label>
-                                    <select class="form-select" id="browse_schema" name="browse_schema" onchange="loadSqlServerTables(); clearJsonSchema();">
+                                    <select class="form-select" id="browse_schema" name="browse_schema" onchange="loadSqlServerTables(); clearJsonSchema();" {% if not sqlserver_connected %}disabled{% endif %}>
                                         <option value="">Select schema...</option>
                                     </select>
                                 </div>
                                 <div class="col-md-4">
                                     <label for="browse_table" class="form-label">Table</label>
-                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();">
+                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();" {% if not sqlserver_connected %}disabled{% endif %}>
                                         <option value="">Select table...</option>
                                     </select>
                                 </div>
                             {% endif %}
                             <div class="col-md-12 mt-2">
-                                <button type="button" class="btn btn-primary" onclick="getSchemaFromBrowse()">Get Schema</button>
+                                <button type="button" class="btn btn-primary" onclick="getSchemaFromBrowse()" id="getSchemaBtn" {% if not_connected %}disabled{% endif %}>Get Schema</button>
                             </div>
                         </div>
                         <div class="row mt-4">
@@ -225,20 +231,20 @@
                         <div class="row mt-3">
                             <div class="col-md-4">
                                 <label for="bq_project_id_browse" class="form-label">BigQuery Project ID</label>
-                                <input type="text" class="form-control" id="bq_project_id_browse" name="bq_project_id" placeholder="Enter BigQuery Project ID" value="my-bq-project">
+                                <input type="text" class="form-control" id="bq_project_id_browse" name="bq_project_id" placeholder="Enter BigQuery Project ID" value="my-bq-project" {% if not_connected %}disabled{% endif %}>
                             </div>
                             <div class="col-md-4">
                                 <label for="bq_dataset_id_browse" class="form-label">BigQuery Dataset ID</label>
-                                <input type="text" class="form-control" id="bq_dataset_id_browse" name="bq_dataset_id" placeholder="Enter BigQuery Dataset ID" value="hr">
+                                <input type="text" class="form-control" id="bq_dataset_id_browse" name="bq_dataset_id" placeholder="Enter BigQuery Dataset ID" value="hr" {% if not_connected %}disabled{% endif %}>
                             </div>
                             <div class="col-md-4">
                                 <label for="bq_table_name_browse" class="form-label">BigQuery Table Name</label>
-                                <input type="text" class="form-control" id="bq_table_name_browse" name="bq_table_name" placeholder="Enter BigQuery Table Name" value="">
+                                <input type="text" class="form-control" id="bq_table_name_browse" name="bq_table_name" placeholder="Enter BigQuery Table Name" value="" {% if not_connected %}disabled{% endif %}>
                             </div>
                         </div>
                         <div class="row mt-3">
                             <div class="col-md-12">
-                                <button type="button" class="btn btn-primary" onclick="generateDDLFromSchema()" id="generateDDLBtn" disabled>Generate DDL</button>
+                                <button type="button" class="btn btn-primary" onclick="generateDDLFromSchema()" id="generateDDLBtn" {% if not_connected %}disabled{% endif %}>Generate DDL</button>
                             </div>
                         </div>
                     </form>
