@@ -121,7 +121,7 @@
                     <div class="mt-4">
                         <h5>Preview: Generated BigQuery DDL</h5>
                         <pre style="background:#f8f9fa; border:1px solid #dee2e6; padding:1em;">{{ ddl }}</pre>
-                        <a href="{{ filename }}" class="btn btn-success mt-2" download>Download SQL file</a>
+                        <a href="data:text/sql;charset=utf-8,{{ ddl | urlencode }}" download="bigquery_ddl.sql" class="btn btn-success mt-2">Download SQL file</a>
                     </div>
                     {% endif %}
                 </div>
