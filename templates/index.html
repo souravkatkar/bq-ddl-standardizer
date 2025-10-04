@@ -204,6 +204,19 @@
                         <button type="button" class="btn btn-primary" onclick="clearConnectionForm()">Clear</button>
                     </div>
                 </form>
+                <!-- Add below the Source Connection form in the sidebar (left-panel) -->
+                <div class="mb-4 mt-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="use_ai_toggle" onchange="toggleAIOptions()">
+                        <label class="form-check-label" for="use_ai_toggle">Use AI</label>
+                    </div>
+                    <div id="ai-model-group" style="display:none; margin-top:1rem;">
+                        <label for="ai_model_select" class="form-label">Select AI Model</label>
+                        <select class="form-select" id="ai_model_select" name="ai_model">
+                            <option value="">Loading models...</option>
+                        </select>
+                    </div>
+                </div>
             </div>
             <!-- Right Panel: Tabs -->
             <div class="col-md-8 right-panel">
@@ -252,10 +265,14 @@
                             <button type="submit" class="btn btn-primary">Generate DDL</button>
                         </form>
                         {% if ddl and active_tab != 'browse' %}
-                        <div class="mt-4">
+                        <div class="mt-4" id="bq_ddl_preview_manual">
                             <h5>Preview: Generated BigQuery DDL</h5>
                             <pre style="background:#f8f9fa; border:1px solid #dee2e6; padding:1em;">{{ ddl }}</pre>
-                            <a href="data:text/sql;charset=utf-8,{{ ddl | urlencode }}" download="bigquery_ddl.sql" class="btn btn-success mt-2">Download SQL file</a>
+                            <div class="btn-row">
+                                <a href="data:text/sql;charset=utf-8,{{ ddl | urlencode }}" download="bigquery_ddl.sql" class="btn btn-primary mt-2" id="downloadDDLBtnManual">Download SQL file</a>
+                                <button type="button" class="btn btn-secondary mt-2" id="standardizeDDLBtnManual" disabled>Standardize DDL</button>
+                                <button type="button" class="btn btn-secondary mt-2" id="addCommentsDDLBtnManual" disabled>Add Comments to DDL</button>
+                            </div>
                         </div>
                         {% endif %}
                     </div>
@@ -377,7 +394,11 @@
                         <div id="bq_ddl_preview" class="mt-4" style="display:none;">
                             <h5>Preview: Generated BigQuery DDL</h5>
                             <pre style="background:#f8f9fa; border:1px solid #dee2e6; padding:1em;"></pre>
-                            <a href="#" class="btn btn-success mt-2" id="downloadDDLBtn" style="display:none;" download>Download SQL file</a>
+                            <div class="btn-row">
+                                <a href="#" class="btn btn-primary mt-2" id="downloadDDLBtn" style="display:none;" download>Download SQL file</a>
+                                <button type="button" class="btn btn-secondary mt-2" id="standardizeDDLBtn" disabled>Standardize DDL</button>
+                                <button type="button" class="btn btn-secondary mt-2" id="addCommentsDDLBtn" disabled>Add Comments to DDL</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -386,5 +407,6 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ai_util.js') }}"></script>
 </body>
 </html>

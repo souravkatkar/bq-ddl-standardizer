@@ -1,10 +1,12 @@
 import json
+import os
 from flask import Flask, render_template, request, url_for, flash, redirect, jsonify, session
 from src.renderer import generate_bq_ddl
 from routes.mysql_routes import mysql_bp
 from routes.postgres_routes import postgres_bp
 from routes.sqlserver_routes import sqlserver_bp
 from routes.oracle_routes import oracle_bp
+from routes.ai_util_routes import ai_util_bp
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"
@@ -12,6 +14,7 @@ app.register_blueprint(mysql_bp)
 app.register_blueprint(postgres_bp)
 app.register_blueprint(sqlserver_bp)
 app.register_blueprint(oracle_bp)
+app.register_blueprint(ai_util_bp)
 
 import re
 
@@ -292,6 +295,7 @@ def generate_bq_ddl_route():
     dataset = f"{bq_project_id}.{bq_dataset_id}" if bq_project_id and bq_dataset_id else bq_dataset_id or schema.get("schema")
     ddl = generate_bq_ddl(bq_table_name, schema.get('columns', []), dataset, schema.get('table_comment'))
     return jsonify({"ddl": ddl})
+
 
 if __name__ == '__main__':
     debug_log("Starting Flask app")

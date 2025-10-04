@@ -6,7 +6,7 @@ def test_sqlserver_connection(host, port, user, password):
     else:
         server = host
     conn_str = (
-        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f"DRIVER={{SQL Server}};"
         f"SERVER={server};"
         f"UID={user};"
         f"PWD={password};"
@@ -26,7 +26,7 @@ def get_sqlserver_schemas(host, port, user, password, database):
     else:
         server = host
     conn_str = (
-        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f"DRIVER={{SQL Server}};"
         f"SERVER={server};"
         f"DATABASE={database};"
         f"UID={user};"
@@ -47,7 +47,7 @@ def get_sqlserver_tables(host, port, user, password, database, schema):
     else:
         server = host
     conn_str = (
-        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f"DRIVER={{SQL Server}};"
         f"SERVER={server};"
         f"DATABASE={database};"
         f"UID={user};"
@@ -72,7 +72,7 @@ def get_sqlserver_table_schema(host, port, user, password, database, schema, tab
     else:
         server = host
     conn_str = (
-        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f"DRIVER={{SQL Server}};"
         f"SERVER={server};"
         f"DATABASE={database};"
         f"UID={user};"

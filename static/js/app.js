@@ -453,3 +453,12 @@ function updateFormAction() {
         form.action = "/connect";
     }
 }
+
+document.getElementById('sourceConnectionForm').addEventListener('submit', function(e) {
+    var dbSystem = document.getElementById('db_system').value;
+    if (!dbSystem) {
+        e.preventDefault();
+        showToast("Please select a source database system before connecting.", "warning", 4000);
+        return false;
+    }
+});
