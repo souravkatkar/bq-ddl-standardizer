@@ -1,24 +1,20 @@
 import json
 from flask import Flask, render_template, request, url_for, flash, redirect, jsonify, session
 from src.renderer import generate_bq_ddl
-from src.mysql_conn import test_mysql_connection, get_mysql_tables, get_mysql_table_schema
-from src.postgres_conn import (
-    test_postgres_connection,
-    get_postgres_schemas,
-    get_postgres_tables,
-    get_postgres_table_schema
-)
-from src.sqlserver_conn import (
-    test_sqlserver_connection,
-    get_sqlserver_schemas,
-    get_sqlserver_tables,
-    get_sqlserver_table_schema
-)
+from routes.mysql_routes import mysql_bp
+from routes.postgres_routes import postgres_bp
+from routes.sqlserver_routes import sqlserver_bp
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key_here"  # Needed for flash messages
+app.secret_key = "your_secret_key_here"
+app.register_blueprint(mysql_bp)
+app.register_blueprint(postgres_bp)
+app.register_blueprint(sqlserver_bp)
 
 import re
+
+def debug_log(message):
+    print(f"[DEBUG] {message}")
 
 def extract_json_schema_from_ddl(source_ddl):
     """
@@ -123,6 +119,7 @@ DEFAULT_SOURCE_DDL = '''CREATE TABLE employees (
 
 @app.route('/', methods=['GET'])
 def home():
+    debug_log("GET / route called")
     return render_template(
         'index.html',
         db_system=request.args.get('db_system', ''),
@@ -144,12 +141,15 @@ def home():
 
 @app.route('/generate', methods=['POST'])
 def generate():
+    debug_log("POST /generate route called")
     json_schema_text = request.form.get('json_schema', '').strip()
     source_ddl_text = request.form.get('source_ddl', '').strip()
     bq_project_id = request.form.get('bq_project_id', '')
     bq_dataset_id = request.form.get('bq_dataset_id', '')
     bq_table_name = request.form.get('bq_table_name', '')
     ddl = None
+
+    debug_log(f"Received form data: json_schema_text={bool(json_schema_text)}, source_ddl_text={bool(source_ddl_text)}")
 
     # If JSON schema is provided, use it
     if json_schema_text:
@@ -159,16 +159,19 @@ def generate():
             table_comment = schema.get('table_comment', '')
             table_name = bq_table_name or schema.get('table_name', '')
             dataset = f"{bq_project_id}.{bq_dataset_id}" if bq_project_id and bq_dataset_id else bq_dataset_id
+            debug_log(f"Calling generate_bq_ddl with table_name={table_name}, columns={columns}, dataset={dataset}")
             ddl = generate_bq_ddl(table_name, columns, dataset, table_comment)
         except Exception as e:
+            debug_log(f"Error in generate_bq_ddl: {e}")
             ddl = f"-- Error: {e}"
     # If only source DDL is provided, extract schema and show it, but do not generate DDL yet
     elif source_ddl_text:
         try:
+            debug_log("Extracting JSON schema from source DDL")
             schema = extract_json_schema_from_ddl(source_ddl_text)
             json_schema_text = json.dumps(schema, indent=4)
-            # Do not generate DDL yet, just show the extracted schema
         except Exception as e:
+            debug_log(f"Error extracting schema from DDL: {e}")
             json_schema_text = f"-- Error extracting schema: {e}"
 
     return render_template(
@@ -190,12 +193,15 @@ def generate():
 
 @app.route('/connect', methods=['POST'])
 def connect():
+    debug_log("POST /connect route called")
     db_system = request.form.get('db_system', '')
     host = request.form.get('host', '')
     port = request.form.get('port', '')
     username = request.form.get('username', '')
     password = request.form.get('password', '')
     database = request.form.get('database', '')
+
+    debug_log(f"Trying to connect to {db_system} with host={host}, port={port}, username={username}")
 
     # Disconnect all source systems before connecting a new one
     session.pop('mysql_connected', None)
@@ -208,41 +214,14 @@ def connect():
     session.pop('sqlserver_dbs', None)
     session.pop('sqlserver_conn', None)
 
+    # Only handle SQL Server here; MySQL and PostgreSQL are handled in their blueprints
     connection_success = False
 
-    if db_system == "mysql":
+    if db_system == "sqlserver":
         try:
-            dbs = test_mysql_connection(host, port, username, password)
-            flash("MySQL connection successful!", "success")
-            session['mysql_connected'] = True
-            session['mysql_dbs'] = dbs
-            session['mysql_conn'] = {
-                'host': host,
-                'port': port,
-                'user': username,
-                'password': password
-            }
-            connection_success = True
-        except Exception as e:
-            flash(f"MySQL connection failed: {e}", "danger")
-    elif db_system == "postgresql":
-        try:
-            dbs = test_postgres_connection(host, port, username, password)
-            flash("PostgreSQL connection successful!", "success")
-            session['postgresql_connected'] = True
-            session['postgresql_dbs'] = dbs
-            session['postgresql_conn'] = {
-                'host': host,
-                'port': port,
-                'user': username,
-                'password': password
-            }
-            connection_success = True
-        except Exception as e:
-            flash(f"PostgreSQL connection failed: {e}", "danger")
-    elif db_system == "sqlserver":
-        try:
+            from src.sqlserver_conn import test_sqlserver_connection
             dbs = test_sqlserver_connection(host, port, username, password)
+            debug_log("SQL Server connection successful")
             flash("SQL Server connection successful!", "success")
             session['sqlserver_connected'] = True
             session['sqlserver_dbs'] = dbs
@@ -254,10 +233,11 @@ def connect():
             }
             connection_success = True
         except Exception as e:
+            debug_log(f"SQL Server connection failed: {e}")
             flash(f"SQL Server connection failed: {e}", "danger")
 
-    # Redirect to Manual tab on failure, Browse tab on success
     if connection_success:
+        debug_log("Redirecting to browse tab after successful connection")
         return redirect(url_for(
             'home',
             db_system=db_system,
@@ -268,7 +248,7 @@ def connect():
             active_tab='browse'
         ))
     else:
-        # Pass all fields except password
+        debug_log("Redirecting to manual tab after failed connection")
         return redirect(url_for(
             'home',
             db_system=db_system,
@@ -279,242 +259,9 @@ def connect():
             active_tab='manual'
         ))
 
-# --- PostgreSQL AJAX endpoints ---
-
-@app.route('/get_postgres_schemas', methods=['GET'])
-def get_postgres_schemas_route():
-    print("Fetching PostgreSQL schemas...")
-    database = request.args.get('database', '')
-    print(f"Requested database: {database}")
-    conn_details = session.get('postgresql_conn')
-    print(f"PostgreSQL connection details from session: {conn_details}")
-    schemas = []
-    if conn_details and database:
-        try:
-            schemas = get_postgres_schemas(
-                conn_details['host'],
-                conn_details['port'],
-                conn_details['user'],
-                conn_details['password'],
-                database
-            )
-            print(f"Schemas found: {schemas}")
-        except Exception as e:
-            print(f"Error fetching PostgreSQL schemas: {e}")
-            schemas = []
-    return jsonify(schemas)
-
-@app.route('/get_postgres_tables', methods=['GET'])
-def get_postgres_tables_route():
-    print("Fetching PostgreSQL tables...")
-    database = request.args.get('database', '')
-    schema = request.args.get('schema', '')
-    print(f"Database: {database}, Schema: {schema}")
-    conn_details = session.get('postgresql_conn')
-    print(f"PostgreSQL connection details from session: {conn_details}")
-    tables = []
-    if conn_details and database and schema:
-        try:
-            tables = get_postgres_tables(
-                conn_details['host'],
-                conn_details['port'],
-                conn_details['user'],
-                conn_details['password'],
-                database,
-                schema
-            )
-            print(f"Tables found: {tables}")
-        except Exception as e:
-            print(f"Error fetching PostgreSQL tables: {e}")
-            tables = []
-    return jsonify(tables)
-
-@app.route('/get_postgres_schema')
-def get_postgres_schema_route():
-    print("Fetching PostgreSQL table schema...")
-    database = request.args.get('database')
-    schema = request.args.get('schema')
-    table = request.args.get('table')
-    print(f"Database: {database}, Schema: {schema}, Table: {table}")
-    conn_details = session.get('postgresql_conn')
-    print(f"PostgreSQL connection details from session: {conn_details}")
-    schema_dict = {}
-    if conn_details and database and schema and table:
-        try:
-            schema_dict = get_postgres_table_schema(
-                conn_details['host'],
-                conn_details['port'],
-                conn_details['user'],
-                conn_details['password'],
-                database,
-                schema,
-                table
-            )
-            print(f"Schema found: {schema_dict}")
-        except Exception as e:
-            print(f"Error fetching PostgreSQL schema: {e}")
-            schema_dict = {"error": str(e)}
-    return jsonify({"schema": schema_dict})
-
-@app.route('/generate_bq_ddl_from_schema', methods=['POST'])
-def generate_bq_ddl_from_schema():
-    data = request.get_json()
-    schema = json.loads(data.get('schema'))
-    bq_project_id = data.get('bq_project_id')
-    bq_dataset_id = data.get('bq_dataset_id')
-    bq_table_name = data.get('bq_table_name') or schema.get('table_name', 'my_table')
-    dataset = f"{bq_project_id}.{bq_dataset_id}" if bq_project_id and bq_dataset_id else bq_dataset_id or schema.get("schema")
-    ddl = generate_bq_ddl(bq_table_name, schema.get('columns', []), dataset, schema.get('table_comment'))
-    return jsonify({"ddl": ddl})
-
-@app.route('/get_schemas')
-def get_schemas():
-    db_system = request.args.get('db_system')
-    database = request.args.get('database')
-    schemas = []
-    if db_system == "postgresql":
-        from src.postgres_conn import get_postgres_schemas
-        conn_details = session.get('postgresql_conn')
-        if conn_details and database:
-            try:
-                schemas = get_postgres_schemas(
-                    conn_details['host'],
-                    conn_details['port'],
-                    conn_details['user'],
-                    conn_details['password'],
-                    database
-                )
-            except Exception as e:
-                print("Error fetching schemas:", e)
-    # ...handle mysql if needed...
-    return jsonify({"schemas": schemas})
-
-@app.route('/get_mysql_tables', methods=['GET'])
-def get_mysql_tables_route():
-    print("Fetching MySQL tables...")
-    database = request.args.get('database', '')
-    print(f"Requested database: {database}")
-    conn_details = session.get('mysql_conn')
-    print(f"MySQL connection details from session: {conn_details}")
-    tables = []
-    if conn_details and database:
-        try:
-            tables = get_mysql_tables(
-                conn_details['host'],
-                conn_details['port'],
-                conn_details['user'],
-                conn_details['password'],
-                database
-            )
-            print(f"Tables found: {tables}")
-        except Exception as e:
-            print(f"Error fetching MySQL tables: {e}")
-            tables = []
-    return jsonify(tables)
-
-@app.route('/get_mysql_schema')
-def get_mysql_schema_route():
-    print("Fetching MySQL table schema...")
-    database = request.args.get('database')
-    table = request.args.get('table')
-    print(f"Database: {database}, Table: {table}")
-    conn_details = session.get('mysql_conn')
-    print(f"MySQL connection details from session: {conn_details}")
-    schema = {}
-    if conn_details and database and table:
-        try:
-            schema = get_mysql_table_schema(
-                conn_details['host'],
-                conn_details['port'],
-                conn_details['user'],
-                conn_details['password'],
-                database,
-                table
-            )
-            print(f"Schema found: {schema}")
-        except Exception as e:
-            print(f"Error fetching MySQL schema: {e}")
-            schema = {"error": str(e)}
-    return jsonify({"schema": schema})
-
-@app.route('/get_sqlserver_schemas', methods=['GET'])
-def get_sqlserver_schemas_route():
-    print("Fetching SQL Server schemas...")
-    database = request.args.get('database', '')
-    print(f"Requested database: {database}")
-    conn_details = session.get('sqlserver_conn')
-    print(f"SQL Server connection details from session: {conn_details}")
-    schemas = []
-    if conn_details and database:
-        try:
-            schemas = get_sqlserver_schemas(
-                conn_details['host'],
-                conn_details['port'],
-                conn_details['user'],
-                conn_details['password'],
-                database
-            )
-            print(f"Schemas found: {schemas}")
-        except Exception as e:
-            print(f"Error fetching SQL Server schemas: {e}")
-            schemas = []
-    return jsonify(schemas)
-
-@app.route('/get_sqlserver_tables', methods=['GET'])
-def get_sqlserver_tables_route():
-    print("Fetching SQL Server tables...")
-    database = request.args.get('database', '')
-    schema = request.args.get('schema', '')
-    print(f"Database: {database}, Schema: {schema}")
-    conn_details = session.get('sqlserver_conn')
-    print(f"SQL Server connection details from session: {conn_details}")
-    tables = []
-    if conn_details and database and schema:
-        try:
-            tables = get_sqlserver_tables(
-                conn_details['host'],
-                conn_details['port'],
-                conn_details['user'],
-                conn_details['password'],
-                database,
-                schema
-            )
-            print(f"Tables found: {tables}")
-        except Exception as e:
-            print(f"Error fetching SQL Server tables: {e}")
-            tables = []
-    return jsonify(tables)
-
-@app.route('/get_sqlserver_schema')
-def get_sqlserver_schema_route():
-    print("Fetching SQL Server table schema...")
-    database = request.args.get('database')
-    schema = request.args.get('schema')
-    table = request.args.get('table')
-    print(f"Database: {database}, Schema: {schema}, Table: {table}")
-    conn_details = session.get('sqlserver_conn')
-    print(f"SQL Server connection details from session: {conn_details}")
-    schema_dict = {}
-    if conn_details and database and schema and table:
-        try:
-            schema_dict = get_sqlserver_table_schema(
-                conn_details['host'],
-                conn_details['port'],
-                conn_details['user'],
-                conn_details['password'],
-                database,
-                schema,
-                table
-            )
-            print(f"Schema found: {schema_dict}")
-        except Exception as e:
-            print(f"Error fetching SQL Server schema: {e}")
-            schema_dict = {"error": str(e)}
-    return jsonify({"schema": schema_dict})
-
 @app.route('/clear_connection', methods=['POST'])
 def clear_connection():
-    print("Clearing all source connections from session.")
+    debug_log("POST /clear_connection route called")
     session.pop('mysql_connected', None)
     session.pop('mysql_dbs', None)
     session.pop('mysql_conn', None)
@@ -524,7 +271,21 @@ def clear_connection():
     session.pop('sqlserver_connected', None)
     session.pop('sqlserver_dbs', None)
     session.pop('sqlserver_conn', None)
+    debug_log("Cleared all connection sessions")
     return ('', 204)
 
+@app.route('/generate_bq_ddl', methods=['POST'])
+def generate_bq_ddl_route():
+    debug_log("POST /generate_bq_ddl route called")
+    data = request.get_json()
+    schema = json.loads(data.get('schema'))
+    bq_project_id = data.get('bq_project_id')
+    bq_dataset_id = data.get('bq_dataset_id')
+    bq_table_name = data.get('bq_table_name') or schema.get('table_name', 'my_table')
+    dataset = f"{bq_project_id}.{bq_dataset_id}" if bq_project_id and bq_dataset_id else bq_dataset_id or schema.get("schema")
+    ddl = generate_bq_ddl(bq_table_name, schema.get('columns', []), dataset, schema.get('table_comment'))
+    return jsonify({"ddl": ddl})
+
 if __name__ == '__main__':
+    debug_log("Starting Flask app")
     app.run(debug=True)

@@ -51,10 +51,10 @@
             <div class="d-flex align-items-center mb-3">
                 <h5 class="me-3">Source Connection</h5>
             </div>
-            <form id="sourceConnectionForm" method="post" action="/connect" class="mb-4">
+            <form id="sourceConnectionForm" method="post" action="/connect">
                 <div class="mb-3">
                     <label for="db_system" class="form-label">Database System</label>
-                    <select name="db_system" class="form-select">
+                    <select name="db_system" id="db_system" class="form-select" onchange="updateFormAction()" aria-label="Select source system">
                         <option value="" {% if not db_system %}selected{% endif %}>Select source system</option>
                         <option value="mysql" {% if db_system == "mysql" %}selected{% endif %}>MySQL</option>
                         <option value="postgresql" {% if db_system == "postgresql" %}selected{% endif %}>PostgreSQL</option>
@@ -461,7 +461,7 @@ function generateDDLFromSchema() {
     const bq_project_id = document.getElementById('bq_project_id_browse').value;
     const bq_dataset_id = document.getElementById('bq_dataset_id_browse').value;
     const bq_table_name = document.getElementById('bq_table_name_browse').value;
-    fetch('/generate_bq_ddl_from_schema', {
+    fetch('/generate_bq_ddl', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
@@ -586,6 +586,20 @@ setTimeout(function() {
         alert.classList.add('hide');
     }
 }, 4000); // 4000 ms = 4 seconds
+
+function updateFormAction() {
+    var dbSystem = document.getElementById('db_system').value;
+    var form = document.getElementById('sourceConnectionForm');
+    if (dbSystem === "mysql") {
+        form.action = "/connect_mysql";
+    } else if (dbSystem === "postgresql") {
+        form.action = "/connect_postgres";
+    } else if (dbSystem === "sqlserver") {
+        form.action = "/connect_sqlserver";
+    } else {
+        form.action = "/connect";
+    }
+}
 </script>
 </body>
 </html>
