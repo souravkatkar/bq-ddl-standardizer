@@ -59,6 +59,9 @@ bq-ddl-standardizer/
 │   ├── postgres_routes.py
 │   ├── sqlserver_routes.py
 │   └── __pycache__/
+├── static/
+│   └── js/
+│       └── app.js
 ├── templates/
 │   └── index.html
 ├── Readme.md
@@ -84,6 +87,8 @@ bq-ddl-standardizer/
   - Only one source system connection is active at a time.
   - "Clear" button resets source connection and UI.
   - Modularized codebase with separate route files for each database system.
+  - **All JavaScript code is now refactored into `static/js/app.js` for maintainability and a cleaner HTML template.**
+  - Toast notifications for alerts and feedback, positioned at the top-right for improved UX.
 
 - **Accessibility:**  
   - ARIA labels for form controls.
