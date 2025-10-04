@@ -5,14 +5,92 @@
     <title>BQ DDL Standardizer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        body {
+            background: #F4F6F8;
+            color: #212529;
+        }
+        .left-panel {
+            background: #fff;
+            border-right: 1px solid #e3e6ea;
+            min-height: 100vh;
+            padding: 2.5rem 2rem 2rem 2rem; /* Increased left panel padding */
+        }
+        .right-panel {
+            background: #fff;
+            min-height: 100vh;
+            padding: 2.5rem 2rem 2rem 2rem; /* Increased right panel padding */
+        }
+        .form-label, h5 {
+            color: #212529;
+            font-weight: 500;
+            margin-bottom: 0.75rem; /* More space below labels */
+        }
+        .form-control, .form-select {
+            background: #F4F6F8;
+            color: #212529;
+            border: 1px solid #e3e6ea;
+            margin-bottom: 1.25rem; /* More space below inputs */
+        }
+        .nav-tabs {
+            background: #F4F6F8;
+            border-bottom: 1px solid #e3e6ea;
+            margin-bottom: 1.5rem; /* More space below tabs */
+        }
+        .nav-tabs .nav-link {
+            color: #0D6EFD;
+            font-weight: 500;
+        }
+        .nav-tabs .nav-link.active {
+            background: #fff;
+            color: #0D6EFD;
+            border-color: #e3e6ea #e3e6ea #fff;
+        }
+        .tab-content {
+            background: #fff;
+            border-radius: 0 0 8px 8px;
+            border: 1px solid #e3e6ea;
+            box-shadow: 0 2px 12px rgba(60,64,67,0.04);
+            margin-bottom: 2rem;
+            padding: 2rem 2rem 2rem 2rem; /* More padding inside tab content */
+        }
         #browse_json_schema {
-            background: #f8f9fa;
+            background: #F4F6F8;
             border: 1px solid #dee2e6;
-            padding: 1em;
+            padding: 1.5em;
             min-height: 300px;
             max-height: 350px;
             overflow: auto;
             font-size: 1em;
+            color: #212529;
+            margin-bottom: 1.5rem;
+        }
+        .btn,
+        .btn-primary,
+        .btn-success {
+            min-width: 160px;
+            max-width: 200px;
+            width: 200px;
+            box-sizing: border-box;
+            margin-bottom: 1rem; /* Increased button spacing */
+            text-align: left;
+        }
+        .row {
+            margin-bottom: 1.5rem; /* More space between rows */
+        }
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+            margin-bottom: 2rem;
+        }
+        .toast-container .toast {
+            background: #34A853;
+            color: #fff;
+        }
+        .btn-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
         }
         @media (min-width: 992px) {
             .left-panel {
@@ -22,6 +100,16 @@
             .right-panel {
                 flex: 0 0 78%;
                 max-width: 78%;
+            }
+        }
+        @media (max-width: 991px) {
+            .left-panel, .right-panel {
+                max-width: 100%;
+                min-width: 100%;
+                border-right: none;
+                border-bottom: 1px solid #e3e6ea;
+                min-height: auto;
+                padding-top: 1rem;
             }
         }
     </style>
@@ -79,17 +167,9 @@
                     <label for="password" class="form-label">Password</label>
                     <input type="password" class="form-control" id="password" name="password" placeholder="Password">
                 </div>
-                <!-- <div class="mb-3">
-                    <label for="database" class="form-label">Database Name</label>
-                    <input type="text" class="form-control" id="database" name="database" placeholder="Database Name" value="{{ database or '' }}">
-                </div> -->
-                <div class="row mt-3">
-                    <div class="col-6 pe-1">
-                        <button type="submit" class="btn btn-primary w-100">Connect</button>
-                    </div>
-                    <div class="col-6 ps-1">
-                        <button type="button" class="btn btn-primary w-100" onclick="clearConnectionForm()">Clear</button>
-                    </div>
+                <div class="btn-row mt-3">
+                    <button type="submit" class="btn btn-primary">Connect</button>
+                    <button type="button" class="btn btn-primary" onclick="clearConnectionForm()">Clear</button>
                 </div>
             </form>
         </div>
@@ -106,18 +186,18 @@
             <div class="tab-content" id="ddlTabContent">
                 <!-- Manual Tab -->
                 <div class="tab-pane fade {% if active_tab != 'browse' %}show active{% endif %}" id="manual" role="tabpanel" aria-labelledby="manual-tab">
-                    <div class="mt-4"></div> <!-- Add this for spacing below the tab headings -->
+                    <div class="mt-4"></div>
                     <form method="POST" action="/generate">
                         <div class="row">
                             <div class="col-md-6">
                                 <label for="json_schema" class="form-label">Source JSON Schema (with db and schema)</label>
                                 <textarea class="form-control mb-2" id="json_schema" name="json_schema" rows="12" placeholder='Paste JSON schema here...' oninput="updateBQTableNameFromJSON()">{{ json_schema_text or '' }}</textarea>
-                                <button type="button" class="btn btn-primary btn-sm mb-3" onclick="clearTextarea('json_schema')">Clear</button>
+                                <button type="button" class="btn btn-primary" onclick="clearTextarea('json_schema')">Clear</button>
                             </div>
                             <div class="col-md-6">
                                 <label for="source_ddl" class="form-label">Source DDL (optional)</label>
                                 <textarea class="form-control mb-2" id="source_ddl" name="source_ddl" rows="12" placeholder="Paste your source DDL here..." oninput="clearTextarea('json_schema')">{{ source_ddl_text or '' }}</textarea>
-                                <button type="button" class="btn btn-primary btn-sm mb-3" onclick="clearTextarea('source_ddl')">Clear</button>
+                                <button type="button" class="btn btn-primary" onclick="clearTextarea('source_ddl')">Clear</button>
                             </div>
                         </div>
                         <div class="row mt-3">
