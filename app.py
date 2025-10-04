@@ -4,12 +4,14 @@ from src.renderer import generate_bq_ddl
 from routes.mysql_routes import mysql_bp
 from routes.postgres_routes import postgres_bp
 from routes.sqlserver_routes import sqlserver_bp
+from routes.oracle_routes import oracle_bp
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"
 app.register_blueprint(mysql_bp)
 app.register_blueprint(postgres_bp)
 app.register_blueprint(sqlserver_bp)
+app.register_blueprint(oracle_bp)
 
 import re
 
@@ -133,6 +135,7 @@ def home():
         postgresql_dbs=session.get('postgresql_dbs', []),
         sqlserver_connected=session.get('sqlserver_connected', False),
         sqlserver_dbs=session.get('sqlserver_dbs', []),
+        oracle_connected=session.get('oracle_connected', False),
         active_tab=request.args.get('active_tab', 'manual'),
         json_schema_text=request.args.get('json_schema_text', DEFAULT_JSON_SCHEMA),
         source_ddl_text=request.args.get('source_ddl_text', DEFAULT_SOURCE_DDL),
@@ -188,6 +191,7 @@ def generate():
         database=request.form.get('database', ''),
         mysql_connected=session.get('mysql_connected', False),
         mysql_dbs=session.get('mysql_dbs', []),
+        oracle_connected=session.get('oracle_connected', False),
         active_tab='manual'
     )
 
@@ -263,14 +267,17 @@ def connect():
 def clear_connection():
     debug_log("POST /clear_connection route called")
     session.pop('mysql_connected', None)
-    session.pop('mysql_dbs', None)
-    session.pop('mysql_conn', None)
     session.pop('postgresql_connected', None)
-    session.pop('postgresql_dbs', None)
-    session.pop('postgresql_conn', None)
     session.pop('sqlserver_connected', None)
+    session.pop('oracle_connected', None)         # <-- Add this line
+    session.pop('mysql_dbs', None)
+    session.pop('postgresql_dbs', None)
     session.pop('sqlserver_dbs', None)
+    session.pop('oracle_dbs', None)               # <-- Add this line
+    session.pop('mysql_conn', None)
+    session.pop('postgresql_conn', None)
     session.pop('sqlserver_conn', None)
+    session.pop('oracle_conn', None)              # <-- Add this line
     debug_log("Cleared all connection sessions")
     return ('', 204)
 

@@ -143,6 +143,67 @@ function loadSqlServerTables() {
         });
 }
 
+function loadOracleSchemas() {
+    fetch('/get_oracle_schemas')
+        .then(response => response.json())
+        .then(data => {
+            let options = '<option value="">Select schema...</option>';
+            for (const schema of data) {
+                options += `<option value="${schema}">${schema}</option>`;
+            }
+            document.getElementById('browse_schema').innerHTML = options;
+            document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+            clearJsonSchema();
+        });
+}
+
+function loadOracleTables() {
+    const schema = document.getElementById('browse_schema').value;
+    if (!schema) {
+        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+        clearJsonSchema();
+        return;
+    }
+    fetch(`/get_oracle_tables?schema=${encodeURIComponent(schema)}`)
+        .then(response => response.json())
+        .then(data => {
+            let options = '<option value="">Select table...</option>';
+            for (const tbl of data) {
+                options += `<option value="${tbl}">${tbl}</option>`;
+            }
+            document.getElementById('browse_table').innerHTML = options;
+            clearJsonSchema();
+        });
+}
+
+// Call this when Oracle is selected and connected
+document.getElementById('db_system').addEventListener('change', function() {
+    var oracleField = document.getElementById('oracle-service-sid-group');
+    if (this.value === 'oracle') {
+        oracleField.style.display = '';
+    } else {
+        oracleField.style.display = 'none';
+    }
+
+    if (this.value === 'oracle' && document.getElementById('browse_schema')) {
+        loadOracleSchemas();
+    }
+});
+
+// Optionally, call loadOracleSchemas() on page load if Oracle is already selected and connected
+window.addEventListener('DOMContentLoaded', function() {
+    var oracleField = document.getElementById('oracle-service-sid-group');
+    if (document.getElementById('db_system').value === 'oracle') {
+        oracleField.style.display = '';
+    } else {
+        oracleField.style.display = 'none';
+    }
+
+    if (document.getElementById('db_system').value === 'oracle' && document.getElementById('browse_schema')) {
+        loadOracleSchemas();
+    }
+});
+
 function clearJsonSchema() {
     document.getElementById('browse_json_schema').textContent = "";
     document.getElementById('generateDDLBtn').disabled = true;
@@ -196,7 +257,7 @@ function showToast(message, type="warning", timeout=4000) {
 
 function getSchemaFromBrowse() {
     const dbSystem = document.getElementById('db_system').value;
-    const db = document.getElementById('browse_database').value;
+    const db = document.getElementById('browse_database') ? document.getElementById('browse_database').value : '';
     const tbl = document.getElementById('browse_table').value;
     if (dbSystem === "postgresql") {
         const schema = document.getElementById('browse_schema').value;
@@ -232,6 +293,20 @@ function getSchemaFromBrowse() {
             return;
         }
         fetch(`/get_mysql_schema?database=${encodeURIComponent(db)}&table=${encodeURIComponent(tbl)}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
+                document.getElementById('bq_table_name_browse').value = data.schema.table_name || '';
+                document.getElementById('generateDDLBtn').disabled = false;
+                document.getElementById('bq_ddl_preview').style.display = 'none';
+            });
+    } else if (dbSystem === "oracle") {
+        const schema = document.getElementById('browse_schema').value;
+        if (!schema || !tbl) {
+            showToast("Please select schema and table.", "warning", 4000);
+            return;
+        }
+        fetch(`/get_oracle_table_schema?schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(tbl)}`)
             .then(response => response.json())
             .then(data => {
                 document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
@@ -372,6 +447,8 @@ function updateFormAction() {
         form.action = "/connect_postgres";
     } else if (dbSystem === "sqlserver") {
         form.action = "/connect_sqlserver";
+    } else if (dbSystem === "oracle") {
+        form.action = "/connect_oracle";
     } else {
         form.action = "/connect";
     }
