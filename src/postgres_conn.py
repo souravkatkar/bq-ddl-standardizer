@@ -55,6 +55,7 @@ def get_postgres_table_schema(host, port, user, password, database, schema, tabl
         database=database
     )
     cursor = conn.cursor()
+    # Get column details
     cursor.execute("""
         SELECT column_name, data_type, is_nullable, column_default
         FROM information_schema.columns
@@ -67,9 +68,20 @@ def get_postgres_table_schema(host, port, user, password, database, schema, tabl
             "name": col[0],
             "type": col[1],
             "nullable": col[2].upper() == "YES",
-            "comment": ""  # Optionally fetch comments separately
+            "comment": ""  # Will be filled below
         })
-    # Optionally fetch table comment
+    # Get column comments
+    cursor.execute("""
+        SELECT a.attname, d.description
+        FROM pg_catalog.pg_attribute a
+        LEFT JOIN pg_catalog.pg_description d
+          ON d.objoid = a.attrelid AND d.objsubid = a.attnum
+        WHERE a.attrelid = %s::regclass AND a.attnum > 0 AND NOT a.attisdropped
+    """, (f'"{schema}"."{table}"',))
+    col_comments = {row[0]: row[1] for row in cursor.fetchall() if row[1]}
+    for col in columns:
+        col["comment"] = col_comments.get(col["name"], "")
+    # Get table comment
     cursor.execute("""
         SELECT obj_description(%s::regclass)
     """, (f'"{schema}"."{table}"',))
