@@ -92,6 +92,19 @@
             gap: 1rem;
             margin-bottom: 1.5rem;
         }
+        .page-title {
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin: 0.5px 0 0 0;   /* Minimal vertical space */
+            letter-spacing: 0.5px;
+            line-height: 0.1;
+            padding: 0;            /* Remove extra padding */
+        }
+        .container-fluid.heading-container {
+            margin-bottom: 0.5rem; /* Reduce space below heading */
+        }
         @media (min-width: 992px) {
             .left-panel {
                 flex: 0 0 22%;
@@ -112,574 +125,630 @@
                 padding-top: 1rem;
             }
         }
+        .toast-container {
+            top: 1rem !important;
+            right: 1rem !important;
+            left: auto !important;
+            transform: none !important;
+        }
     </style>
 </head>
 <body>
-<div aria-live="polite" aria-atomic="true" class="position-relative">
-  <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1080;">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% set category, message = messages[-1] %}
-        <div id="flashToast" class="toast align-items-center text-bg-{{ 'success' if category == 'success' else 'danger' if category == 'danger' else 'warning' }} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-          <div class="d-flex">
-            <div class="toast-body">
-              {{ message }}
+    <div class="container-fluid mt-4 heading-container">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="page-title">BigQuery DDL Standardizer</h1>
             </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-          </div>
         </div>
-      {% endif %}
-    {% endwith %}
-  </div>
-</div>
-<div class="container-fluid mt-5">
-    <div class="row">
-        <!-- Left Panel: Source System Connection -->
-        <div class="col-md-4 left-panel border-end">
-            <div class="d-flex align-items-center mb-3">
-                <h5 class="me-3">Source Connection</h5>
+    </div>
+    <div aria-live="polite" aria-atomic="true" class="position-relative">
+      <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1080;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% set category, message = messages[-1] %}
+            <div id="flashToast" class="toast align-items-center text-bg-{{ 'success' if category == 'success' else 'danger' if category == 'danger' else 'warning' }} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+              <div class="d-flex">
+                <div class="toast-body">
+                  {{ message }}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+              </div>
             </div>
-            <form id="sourceConnectionForm" method="post" action="/connect">
-                <div class="mb-3">
-                    <label for="db_system" class="form-label">Database System</label>
-                    <select name="db_system" id="db_system" class="form-select" onchange="updateFormAction()" aria-label="Select source system">
-                        <option value="" {% if not db_system %}selected{% endif %}>Select source system</option>
-                        <option value="mysql" {% if db_system == "mysql" %}selected{% endif %}>MySQL</option>
-                        <option value="postgresql" {% if db_system == "postgresql" %}selected{% endif %}>PostgreSQL</option>
-                        <option value="sqlserver" {% if db_system == "sqlserver" %}selected{% endif %}>SQL Server</option>
-                        <option value="oracle" disabled style="color: #888;">Oracle (coming soon)</option>
-                        <option value="snowflake" disabled style="color: #888;">Snowflake (coming soon)</option>
-                    </select>
+          {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+    <div class="container-fluid mt-5">
+        <div class="row">
+            <!-- Left Panel: Source System Connection -->
+            <div class="col-md-4 left-panel border-end">
+                <div class="d-flex align-items-center mb-3">
+                    <h5 class="me-3">Source Connection</h5>
                 </div>
-                <div class="mb-3">
-                    <label for="host" class="form-label">Host</label>
-                    <input type="text" class="form-control" id="host" name="host" placeholder="e.g. localhost" value="{{ host }}">
-                </div>
-                <div class="mb-3">
-                    <label for="port" class="form-label">Port</label>
-                    <input type="text" class="form-control" id="port" name="port" placeholder="e.g. 3306" value="{{ port }}">
-                </div>
-                <div class="mb-3">
-                    <label for="username" class="form-label">Username</label>
-                    <input type="text" class="form-control" id="username" name="username" placeholder="Username" value="{{ username }}">
-                </div>
-                <div class="mb-3">
-                    <label for="password" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="password" name="password" placeholder="Password">
-                </div>
-                <div class="btn-row mt-3">
-                    <button type="submit" class="btn btn-primary">Connect</button>
-                    <button type="button" class="btn btn-primary" onclick="clearConnectionForm()">Clear</button>
-                </div>
-            </form>
-        </div>
-        <!-- Right Panel: Tabs -->
-        <div class="col-md-8 right-panel">
-            <ul class="nav nav-tabs" id="ddlTab" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {% if active_tab != 'browse' %}active{% endif %}" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab" aria-controls="manual" aria-selected="{{ 'true' if active_tab != 'browse' else 'false' }}">Manual</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {% if active_tab == 'browse' %}active{% endif %}" id="browse-tab" data-bs-toggle="tab" data-bs-target="#browse" type="button" role="tab" aria-controls="browse" aria-selected="{{ 'true' if active_tab == 'browse' else 'false' }}">Browse Source</button>
-                </li>
-            </ul>
-            <div class="tab-content" id="ddlTabContent">
-                <!-- Manual Tab -->
-                <div class="tab-pane fade {% if active_tab != 'browse' %}show active{% endif %}" id="manual" role="tabpanel" aria-labelledby="manual-tab">
-                    <div class="mt-4"></div>
-                    <form method="POST" action="/generate">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label for="json_schema" class="form-label">Source JSON Schema (with db and schema)</label>
-                                <textarea class="form-control mb-2" id="json_schema" name="json_schema" rows="12" placeholder='Paste JSON schema here...' oninput="updateBQTableNameFromJSON()">{{ json_schema_text or '' }}</textarea>
-                                <button type="button" class="btn btn-primary" onclick="clearTextarea('json_schema')">Clear</button>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="source_ddl" class="form-label">Source DDL (optional)</label>
-                                <textarea class="form-control mb-2" id="source_ddl" name="source_ddl" rows="12" placeholder="Paste your source DDL here..." oninput="clearTextarea('json_schema')">{{ source_ddl_text or '' }}</textarea>
-                                <button type="button" class="btn btn-primary" onclick="clearTextarea('source_ddl')">Clear</button>
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col-md-4">
-                                <label for="bq_project_id" class="form-label">BigQuery Project ID</label>
-                                <input type="text" class="form-control" id="bq_project_id" name="bq_project_id" placeholder="Enter BigQuery Project ID" value="my-bq-project">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="bq_dataset_id" class="form-label">BigQuery Dataset ID</label>
-                                <input type="text" class="form-control" id="bq_dataset_id" name="bq_dataset_id" placeholder="Enter BigQuery Dataset ID" value="hr">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="bq_table_name" class="form-label">BigQuery Table Name</label>
-                                <input type="text" class="form-control" id="bq_table_name" name="bq_table_name" placeholder="Enter BigQuery Table Name" value="{{ bq_table_name or '' }}">
-                            </div>
-                        </div>
-                        <div class="mb-2 text-muted mt-2" style="font-size:0.95em;">
-                            <span>Provide either a JSON schema or a source DDL. If both are provided, JSON schema will be used. If JSON schema is empty, table name will be taken from DDL and extracted schema will be shown here.</span>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Generate DDL</button>
-                    </form>
-                    {% if ddl and active_tab != 'browse' %}
-                    <div class="mt-4">
-                        <h5>Preview: Generated BigQuery DDL</h5>
-                        <pre style="background:#f8f9fa; border:1px solid #dee2e6; padding:1em;">{{ ddl }}</pre>
-                        <a href="data:text/sql;charset=utf-8,{{ ddl | urlencode }}" download="bigquery_ddl.sql" class="btn btn-success mt-2">Download SQL file</a>
+                <form id="sourceConnectionForm" method="post" action="/connect">
+                    <div class="mb-3">
+                        <label for="db_system" class="form-label">Database System</label>
+                        <select name="db_system" id="db_system" class="form-select" onchange="updateFormAction()" aria-label="Select source system">
+                            <option value="" {% if not db_system %}selected{% endif %}>Select source system</option>
+                            <option value="mysql" {% if db_system == "mysql" %}selected{% endif %}>MySQL</option>
+                            <option value="postgresql" {% if db_system == "postgresql" %}selected{% endif %}>PostgreSQL</option>
+                            <option value="sqlserver" {% if db_system == "sqlserver" %}selected{% endif %}>SQL Server</option>
+                            <option value="oracle" disabled style="color: #888;">Oracle (coming soon)</option>
+                            <option value="snowflake" disabled style="color: #888;">Snowflake (coming soon)</option>
+                        </select>
                     </div>
-                    {% endif %}
-                </div>
-                <!-- Browse Source Tab -->
-                <div class="tab-pane fade {% if active_tab == 'browse' %}show active{% endif %}" id="browse" role="tabpanel" aria-labelledby="browse-tab">
-                    {% set not_connected = not (mysql_connected or postgresql_connected or sqlserver_connected) %}
-                    {% if not_connected %}
-                        <div class="alert alert-warning mt-4" role="alert">
-                            <strong>Notice:</strong> Please connect to a source system before accessing the Browse section.
-                        </div>
-                    {% endif %}
-                    <form id="browseSourceForm" onsubmit="return false;">
-                        <div class="row mt-3">
-                            {% if db_system == "mysql" %}
+                    <div class="mb-3">
+                        <label for="host" class="form-label">Host</label>
+                        <input type="text" class="form-control" id="host" name="host" placeholder="e.g. localhost" value="{{ host }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="port" class="form-label">Port</label>
+                        <input type="text" class="form-control" id="port" name="port" placeholder="e.g. 3306" value="{{ port }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" placeholder="Username" value="{{ username }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Password">
+                    </div>
+                    <div class="btn-row mt-3">
+                        <button type="submit" class="btn btn-primary">Connect</button>
+                        <button type="button" class="btn btn-primary" onclick="clearConnectionForm()">Clear</button>
+                    </div>
+                </form>
+            </div>
+            <!-- Right Panel: Tabs -->
+            <div class="col-md-8 right-panel">
+                <ul class="nav nav-tabs" id="ddlTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if active_tab != 'browse' %}active{% endif %}" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab" aria-controls="manual" aria-selected="{{ 'true' if active_tab != 'browse' else 'false' }}">Manual</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if active_tab == 'browse' %}active{% endif %}" id="browse-tab" data-bs-toggle="tab" data-bs-target="#browse" type="button" role="tab" aria-controls="browse" aria-selected="{{ 'true' if active_tab == 'browse' else 'false' }}">Browse Source</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="ddlTabContent">
+                    <!-- Manual Tab -->
+                    <div class="tab-pane fade {% if active_tab != 'browse' %}show active{% endif %}" id="manual" role="tabpanel" aria-labelledby="manual-tab">
+                        <div class="mt-4"></div>
+                        <form method="POST" action="/generate">
+                            <div class="row">
                                 <div class="col-md-6">
-                                    <label for="browse_database" class="form-label">Database</label>
-                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadMysqlTables(); clearJsonSchema();" {% if not mysql_connected %}disabled{% endif %}>
-                                        <option value="">Select database...</option>
-                                        {% for db in mysql_dbs %}
-                                            <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
-                                        {% endfor %}
-                                    </select>
+                                    <label for="json_schema" class="form-label">Source JSON Schema (with db and schema)</label>
+                                    <textarea class="form-control mb-2" id="json_schema" name="json_schema" rows="12" placeholder='Paste JSON schema here...' oninput="updateBQTableNameFromJSON()">{{ json_schema_text or '' }}</textarea>
+                                    <button type="button" class="btn btn-primary" onclick="clearTextarea('json_schema')">Clear</button>
                                 </div>
                                 <div class="col-md-6">
-                                    <label for="browse_table" class="form-label">Table</label>
-                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();" {% if not mysql_connected %}disabled{% endif %}>
-                                        <option value="">Select table...</option>
-                                    </select>
+                                    <label for="source_ddl" class="form-label">Source DDL (optional)</label>
+                                    <textarea class="form-control mb-2" id="source_ddl" name="source_ddl" rows="12" placeholder="Paste your source DDL here..." oninput="clearTextarea('json_schema')">{{ source_ddl_text or '' }}</textarea>
+                                    <button type="button" class="btn btn-primary" onclick="clearTextarea('source_ddl')">Clear</button>
                                 </div>
-                            {% elif db_system == "postgresql" %}
-                                <div class="col-md-4">
-                                    <label for="browse_database" class="form-label">Database</label>
-                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadPostgresSchemas(); clearJsonSchema();" {% if not postgresql_connected %}disabled{% endif %}>
-                                        <option value="">Select database...</option>
-                                        {% for db in postgresql_dbs %}
-                                            <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="browse_schema" class="form-label">Schema</label>
-                                    <select class="form-select" id="browse_schema" name="browse_schema" onchange="loadPostgresTables(); clearJsonSchema();" {% if not postgresql_connected %}disabled{% endif %}>
-                                        <option value="">Select schema...</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="browse_table" class="form-label">Table</label>
-                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();" {% if not postgresql_connected %}disabled{% endif %}>
-                                        <option value="">Select table...</option>
-                                    </select>
-                                </div>
-                            {% elif db_system == "sqlserver" %}
-                                <div class="col-md-4">
-                                    <label for="browse_database" class="form-label">Database</label>
-                                    <select class="form-select" id="browse_database" name="browse_database" onchange="loadSqlServerSchemas(); clearJsonSchema();" {% if not sqlserver_connected %}disabled{% endif %}>
-                                        <option value="">Select database...</option>
-                                        {% for db in sqlserver_dbs %}
-                                            <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="browse_schema" class="form-label">Schema</label>
-                                    <select class="form-select" id="browse_schema" name="browse_schema" onchange="loadSqlServerTables(); clearJsonSchema();" {% if not sqlserver_connected %}disabled{% endif %}>
-                                        <option value="">Select schema...</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="browse_table" class="form-label">Table</label>
-                                    <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();" {% if not sqlserver_connected %}disabled{% endif %}>
-                                        <option value="">Select table...</option>
-                                    </select>
-                                </div>
-                            {% endif %}
-                            <div class="col-md-12 mt-2">
-                                <button type="button" class="btn btn-primary" onclick="getSchemaFromBrowse()" id="getSchemaBtn" {% if not_connected %}disabled{% endif %}>Get Schema</button>
                             </div>
+                            <div class="row mt-3">
+                                <div class="col-md-4">
+                                    <label for="bq_project_id" class="form-label">BigQuery Project ID</label>
+                                    <input type="text" class="form-control" id="bq_project_id" name="bq_project_id" placeholder="Enter BigQuery Project ID" value="my-bq-project">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="bq_dataset_id" class="form-label">BigQuery Dataset ID</label>
+                                    <input type="text" class="form-control" id="bq_dataset_id" name="bq_dataset_id" placeholder="Enter BigQuery Dataset ID" value="hr">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="bq_table_name" class="form-label">BigQuery Table Name</label>
+                                    <input type="text" class="form-control" id="bq_table_name" name="bq_table_name" placeholder="Enter BigQuery Table Name" value="{{ bq_table_name or '' }}">
+                                </div>
+                            </div>
+                            <div class="mb-2 text-muted mt-2" style="font-size:0.95em;">
+                                <span>Provide either a JSON schema or a source DDL. If both are provided, JSON schema will be used. If JSON schema is empty, table name will be taken from DDL and extracted schema will be shown here.</span>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Generate DDL</button>
+                        </form>
+                        {% if ddl and active_tab != 'browse' %}
+                        <div class="mt-4">
+                            <h5>Preview: Generated BigQuery DDL</h5>
+                            <pre style="background:#f8f9fa; border:1px solid #dee2e6; padding:1em;">{{ ddl }}</pre>
+                            <a href="data:text/sql;charset=utf-8,{{ ddl | urlencode }}" download="bigquery_ddl.sql" class="btn btn-success mt-2">Download SQL file</a>
                         </div>
-                        <div class="row mt-4">
-                            <div class="col-md-12">
-                                <h6>Source JSON Schema</h6>
-                                <pre id="browse_json_schema"></pre>
+                        {% endif %}
+                    </div>
+                    <!-- Browse Source Tab -->
+                    <div class="tab-pane fade {% if active_tab == 'browse' %}show active{% endif %}" id="browse" role="tabpanel" aria-labelledby="browse-tab">
+                        {% set not_connected = not (mysql_connected or postgresql_connected or sqlserver_connected) %}
+                        {% if not_connected %}
+                            <div class="alert alert-warning mt-4" role="alert">
+                                <strong>Notice:</strong> Please connect to a source system before accessing the Browse section.
                             </div>
+                        {% endif %}
+                        <form id="browseSourceForm" onsubmit="return false;">
+                            <div class="row mt-3">
+                                {% if db_system == "mysql" %}
+                                    <div class="col-md-6">
+                                        <label for="browse_database" class="form-label">Database</label>
+                                        <select class="form-select" id="browse_database" name="browse_database" onchange="loadMysqlTables(); clearJsonSchema();" {% if not mysql_connected %}disabled{% endif %}>
+                                            <option value="">Select database...</option>
+                                            {% for db in mysql_dbs %}
+                                                <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="browse_table" class="form-label">Table</label>
+                                        <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();" {% if not mysql_connected %}disabled{% endif %}>
+                                            <option value="">Select table...</option>
+                                        </select>
+                                    </div>
+                                {% elif db_system == "postgresql" %}
+                                    <div class="col-md-4">
+                                        <label for="browse_database" class="form-label">Database</label>
+                                        <select class="form-select" id="browse_database" name="browse_database" onchange="loadPostgresSchemas(); clearJsonSchema();" {% if not postgresql_connected %}disabled{% endif %}>
+                                            <option value="">Select database...</option>
+                                            {% for db in postgresql_dbs %}
+                                                <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="browse_schema" class="form-label">Schema</label>
+                                        <select class="form-select" id="browse_schema" name="browse_schema" onchange="loadPostgresTables(); clearJsonSchema();" {% if not postgresql_connected %}disabled{% endif %}>
+                                            <option value="">Select schema...</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="browse_table" class="form-label">Table</label>
+                                        <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();" {% if not postgresql_connected %}disabled{% endif %}>
+                                            <option value="">Select table...</option>
+                                        </select>
+                                    </div>
+                                {% elif db_system == "sqlserver" %}
+                                    <div class="col-md-4">
+                                        <label for="browse_database" class="form-label">Database</label>
+                                        <select class="form-select" id="browse_database" name="browse_database" onchange="loadSqlServerSchemas(); clearJsonSchema();" {% if not sqlserver_connected %}disabled{% endif %}>
+                                            <option value="">Select database...</option>
+                                            {% for db in sqlserver_dbs %}
+                                                <option value="{{ db }}" {% if db == database %}selected{% endif %}>{{ db }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="browse_schema" class="form-label">Schema</label>
+                                        <select class="form-select" id="browse_schema" name="browse_schema" onchange="loadSqlServerTables(); clearJsonSchema();" {% if not sqlserver_connected %}disabled{% endif %}>
+                                            <option value="">Select schema...</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="browse_table" class="form-label">Table</label>
+                                        <select class="form-select" id="browse_table" name="browse_table" onchange="clearJsonSchema();" {% if not sqlserver_connected %}disabled{% endif %}>
+                                            <option value="">Select table...</option>
+                                        </select>
+                                    </div>
+                                {% endif %}
+                                <div class="col-md-12 mt-2">
+                                    <button type="button" class="btn btn-primary" onclick="getSchemaFromBrowse()" id="getSchemaBtn" {% if not_connected %}disabled{% endif %}>Get Schema</button>
+                                </div>
+                            </div>
+                            <div class="row mt-4">
+                                <div class="col-md-12">
+                                    <h6>Source JSON Schema</h6>
+                                    <pre id="browse_json_schema"></pre>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-4">
+                                    <label for="bq_project_id_browse" class="form-label">BigQuery Project ID</label>
+                                    <input type="text" class="form-control" id="bq_project_id_browse" name="bq_project_id" placeholder="Enter BigQuery Project ID" value="my-bq-project" {% if not_connected %}disabled{% endif %}>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="bq_dataset_id_browse" class="form-label">BigQuery Dataset ID</label>
+                                    <input type="text" class="form-control" id="bq_dataset_id_browse" name="bq_dataset_id" placeholder="Enter BigQuery Dataset ID" value="hr" {% if not_connected %}disabled{% endif %}>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="bq_table_name_browse" class="form-label">BigQuery Table Name</label>
+                                    <input type="text" class="form-control" id="bq_table_name_browse" name="bq_table_name" placeholder="Enter BigQuery Table Name" value="" {% if not_connected %}disabled{% endif %}>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-12">
+                                    <button type="button" class="btn btn-primary" onclick="generateDDLFromSchema()" id="generateDDLBtn" {% if not_connected %}disabled{% endif %}>Generate DDL</button>
+                                </div>
+                            </div>
+                        </form>
+                        <div id="bq_ddl_preview" class="mt-4" style="display:none;">
+                            <h5>Preview: Generated BigQuery DDL</h5>
+                            <pre style="background:#f8f9fa; border:1px solid #dee2e6; padding:1em;"></pre>
+                            <a href="#" class="btn btn-success mt-2" id="downloadDDLBtn" style="display:none;" download>Download SQL file</a>
                         </div>
-                        <div class="row mt-3">
-                            <div class="col-md-4">
-                                <label for="bq_project_id_browse" class="form-label">BigQuery Project ID</label>
-                                <input type="text" class="form-control" id="bq_project_id_browse" name="bq_project_id" placeholder="Enter BigQuery Project ID" value="my-bq-project" {% if not_connected %}disabled{% endif %}>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="bq_dataset_id_browse" class="form-label">BigQuery Dataset ID</label>
-                                <input type="text" class="form-control" id="bq_dataset_id_browse" name="bq_dataset_id" placeholder="Enter BigQuery Dataset ID" value="hr" {% if not_connected %}disabled{% endif %}>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="bq_table_name_browse" class="form-label">BigQuery Table Name</label>
-                                <input type="text" class="form-control" id="bq_table_name_browse" name="bq_table_name" placeholder="Enter BigQuery Table Name" value="" {% if not_connected %}disabled{% endif %}>
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col-md-12">
-                                <button type="button" class="btn btn-primary" onclick="generateDDLFromSchema()" id="generateDDLBtn" {% if not_connected %}disabled{% endif %}>Generate DDL</button>
-                            </div>
-                        </div>
-                    </form>
-                    <div id="bq_ddl_preview" class="mt-4" style="display:none;">
-                        <h5>Preview: Generated BigQuery DDL</h5>
-                        <pre style="background:#f8f9fa; border:1px solid #dee2e6; padding:1em;"></pre>
-                        <a href="#" class="btn btn-success mt-2" id="downloadDDLBtn" style="display:none;" download>Download SQL file</a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-window.addEventListener('DOMContentLoaded', function() {
-    var toastEl = document.getElementById('flashToast');
-    if (toastEl) {
-        var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
-        toast.show();
-    }
-});
-
-function loadMysqlTables() {
-    const db = document.getElementById('browse_database').value;
-    if (!db) {
-        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
-        clearJsonSchema();
-        return;
-    }
-    document.getElementById('browse_table').innerHTML = '<option>Loading...</option>';
-    fetch(`/get_mysql_tables?database=${encodeURIComponent(db)}`)
-        .then(response => response.json())
-        .then(data => {
-            let options = '<option value="">Select table...</option>';
-            for (const tbl of data) {
-                options += `<option value="${tbl}">${tbl}</option>`;
-            }
-            document.getElementById('browse_table').innerHTML = options;
-            clearJsonSchema();
-        })
-        .catch(() => {
-            document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
-            clearJsonSchema();
-        });
-}
-
-function loadPostgresSchemas() {
-    const db = document.getElementById('browse_database').value;
-    if (!db) {
-        document.getElementById('browse_schema').innerHTML = '<option value="">Select schema...</option>';
-        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
-        clearJsonSchema();
-        return;
-    }
-    fetch(`/get_postgres_schemas?database=${encodeURIComponent(db)}`)
-        .then(response => response.json())
-        .then(data => {
-            let options = '<option value="">Select schema...</option>';
-            for (const schema of data) {
-                options += `<option value="${schema}">${schema}</option>`;
-            }
-            document.getElementById('browse_schema').innerHTML = options;
-            document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
-            clearJsonSchema();
-        });
-}
-
-function loadPostgresTables() {
-    const db = document.getElementById('browse_database').value;
-    const schema = document.getElementById('browse_schema').value;
-    if (!db || !schema) {
-        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
-        clearJsonSchema();
-        return;
-    }
-    fetch(`/get_postgres_tables?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`)
-        .then(response => response.json())
-        .then(data => {
-            let options = '<option value="">Select table...</option>';
-            for (const tbl of data) {
-                options += `<option value="${tbl}">${tbl}</option>`;
-            }
-            document.getElementById('browse_table').innerHTML = options;
-            clearJsonSchema();
-        });
-}
-
-function loadSqlServerSchemas() {
-    const db = document.getElementById('browse_database').value;
-    if (!db) {
-        document.getElementById('browse_schema').innerHTML = '<option value="">Select schema...</option>';
-        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
-        clearJsonSchema();
-        return;
-    }
-    fetch(`/get_sqlserver_schemas?database=${encodeURIComponent(db)}`)
-        .then(response => response.json())
-        .then(data => {
-            let options = '<option value="">Select schema...</option>';
-            for (const schema of data) {
-                options += `<option value="${schema}">${schema}</option>`;
-            }
-            document.getElementById('browse_schema').innerHTML = options;
-            document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
-            clearJsonSchema();
-        });
-}
-
-function loadSqlServerTables() {
-    const db = document.getElementById('browse_database').value;
-    const schema = document.getElementById('browse_schema').value;
-    if (!db || !schema) {
-        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
-        clearJsonSchema();
-        return;
-    }
-    fetch(`/get_sqlserver_tables?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`)
-        .then(response => response.json())
-        .then(data => {
-            let options = '<option value="">Select table...</option>';
-            for (const tbl of data) {
-                options += `<option value="${tbl}">${tbl}</option>`;
-            }
-            document.getElementById('browse_table').innerHTML = options;
-            clearJsonSchema();
-        });
-}
-
-function clearJsonSchema() {
-    document.getElementById('browse_json_schema').textContent = "";
-    document.getElementById('generateDDLBtn').disabled = true;
-    document.getElementById('bq_ddl_preview').style.display = 'none';
-    document.getElementById('bq_ddl_preview').querySelector('pre').textContent = "";
-    document.getElementById('bq_table_name_browse').value = "";
-}
-
-document.addEventListener("DOMContentLoaded", function() {
-    clearJsonSchema();
-    var browseTable = document.getElementById('browse_table');
-    var bqTableName = document.getElementById('bq_table_name_browse');
-    if (browseTable && bqTableName) {
-        browseTable.addEventListener('change', function() {
-            bqTableName.value = browseTable.value;
-        });
-    }
-    {% if active_tab == 'browse' and mysql_connected and database %}
-    loadMysqlTables();
-    {% elif active_tab == 'browse' and postgresql_connected and database %}
-    loadPostgresSchemas();
-    {% elif active_tab == 'browse' and sqlserver_connected and database %}
-    loadSqlServerSchemas();
-    {% endif %}
-    {% if active_tab == 'browse' %}
-    var browseTab = document.getElementById('browse-tab');
-    if (browseTab) {
-        var tab = new bootstrap.Tab(browseTab);
-        tab.show();
-    }
-    {% endif %}
-});
-
-function getSchemaFromBrowse() {
-    const dbSystem = "{{ db_system }}";
-    const db = document.getElementById('browse_database').value;
-    const tbl = document.getElementById('browse_table').value;
-    if (dbSystem === "postgresql") {
-        const schema = document.getElementById('browse_schema').value;
-        if (!db || !schema || !tbl) {
-            alert("Please select database, schema, and table.");
-            return;
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    window.addEventListener('DOMContentLoaded', function() {
+        var toastEl = document.getElementById('flashToast');
+        if (toastEl) {
+            var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+            toast.show();
         }
-        fetch(`/get_postgres_schema?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(tbl)}`)
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
-                document.getElementById('bq_table_name_browse').value = data.schema.table_name || '';
-                document.getElementById('generateDDLBtn').disabled = false;
-                document.getElementById('bq_ddl_preview').style.display = 'none';
-            });
-    } else if (dbSystem === "sqlserver") {
-        const schema = document.getElementById('browse_schema').value;
-        if (!db || !schema || !tbl) {
-            alert("Please select database, schema, and table.");
-            return;
-        }
-        fetch(`/get_sqlserver_schema?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(tbl)}`)
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
-                document.getElementById('bq_table_name_browse').value = data.schema.table_name || '';
-                document.getElementById('generateDDLBtn').disabled = false;
-                document.getElementById('bq_ddl_preview').style.display = 'none';
-            });
-    } else {
-        // MySQL
-        if (!db || !tbl) {
-            alert("Please select both database and table.");
-            return;
-        }
-        fetch(`/get_mysql_schema?database=${encodeURIComponent(db)}&table=${encodeURIComponent(tbl)}`)
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
-                document.getElementById('bq_table_name_browse').value = data.schema.table_name || '';
-                document.getElementById('generateDDLBtn').disabled = false;
-                document.getElementById('bq_ddl_preview').style.display = 'none';
-            });
-    }
-}
-
-function generateDDLFromSchema() {
-    const schemaText = document.getElementById('browse_json_schema').textContent;
-    const bq_project_id = document.getElementById('bq_project_id_browse').value;
-    const bq_dataset_id = document.getElementById('bq_dataset_id_browse').value;
-    const bq_table_name = document.getElementById('bq_table_name_browse').value;
-    fetch('/generate_bq_ddl', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            schema: schemaText,
-            bq_project_id: bq_project_id,
-            bq_dataset_id: bq_dataset_id,
-            bq_table_name: bq_table_name
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('bq_ddl_preview').style.display = 'block';
-        document.getElementById('bq_ddl_preview').querySelector('pre').textContent = data.ddl;
-        // Optional: enable download
-        let blob = new Blob([data.ddl], {type: "text/sql"});
-        let url = URL.createObjectURL(blob);
-        let downloadBtn = document.getElementById('downloadDDLBtn');
-        downloadBtn.href = url;
-        downloadBtn.style.display = 'inline-block';
     });
-}
 
-function updateBQTableNameFromJSON() {
-    try {
-        var jsonText = document.getElementById('json_schema').value;
-        var jsonObj = JSON.parse(jsonText);
-        if (jsonObj.table_name) {
-            document.getElementById('bq_table_name').value = jsonObj.table_name;
+    function loadMysqlTables() {
+        const db = document.getElementById('browse_database').value;
+        if (!db) {
+            document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+            clearJsonSchema();
+            return;
         }
-    } catch (e) {
-        // Ignore parse errors
+        document.getElementById('browse_table').innerHTML = '<option>Loading...</option>';
+        fetch(`/get_mysql_tables?database=${encodeURIComponent(db)}`)
+            .then(response => response.json())
+            .then(data => {
+                let options = '<option value="">Select table...</option>';
+                for (const tbl of data) {
+                    options += `<option value="${tbl}">${tbl}</option>`;
+                }
+                document.getElementById('browse_table').innerHTML = options;
+                clearJsonSchema();
+            })
+            .catch(() => {
+                document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+                clearJsonSchema();
+            });
     }
-}
 
-function updateBQTableNameFromDDL() {
-    var ddlText = document.getElementById('source_ddl').value;
-    var match = ddlText.match(/CREATE\s+TABLE\s+[`"]?(\w+)[`"]?/i);
-    if (match && match[1]) {
-        document.getElementById('bq_table_name').value = match[1];
+    function loadPostgresSchemas() {
+        const db = document.getElementById('browse_database').value;
+        if (!db) {
+            document.getElementById('browse_schema').innerHTML = '<option value="">Select schema...</option>';
+            document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+            clearJsonSchema();
+            return;
+        }
+        fetch(`/get_postgres_schemas?database=${encodeURIComponent(db)}`)
+            .then(response => response.json())
+            .then(data => {
+                let options = '<option value="">Select schema...</option>';
+                for (const schema of data) {
+                    options += `<option value="${schema}">${schema}</option>`;
+                }
+                document.getElementById('browse_schema').innerHTML = options;
+                document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+                clearJsonSchema();
+            });
     }
-}
 
-// Optionally, call both on input
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('json_schema').addEventListener('input', updateBQTableNameFromJSON);
-    document.getElementById('source_ddl').addEventListener('input', updateBQTableNameFromDDL);
-    // Initial population
-    updateBQTableNameFromJSON();
-    updateBQTableNameFromDDL();
-});
+    function loadPostgresTables() {
+        const db = document.getElementById('browse_database').value;
+        const schema = document.getElementById('browse_schema').value;
+        if (!db || !schema) {
+            document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+            clearJsonSchema();
+            return;
+        }
+        fetch(`/get_postgres_tables?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`)
+            .then(response => response.json())
+            .then(data => {
+                let options = '<option value="">Select table...</option>';
+                for (const tbl of data) {
+                    options += `<option value="${tbl}">${tbl}</option>`;
+                }
+                document.getElementById('browse_table').innerHTML = options;
+                clearJsonSchema();
+            });
+    }
 
-function clearTextarea(id) {
-    document.getElementById(id).value = "";
-    if (id === "json_schema") {
+    function loadSqlServerSchemas() {
+        const db = document.getElementById('browse_database').value;
+        if (!db) {
+            document.getElementById('browse_schema').innerHTML = '<option value="">Select schema...</option>';
+            document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+            clearJsonSchema();
+            return;
+        }
+        fetch(`/get_sqlserver_schemas?database=${encodeURIComponent(db)}`)
+            .then(response => response.json())
+            .then(data => {
+                let options = '<option value="">Select schema...</option>';
+                for (const schema of data) {
+                    options += `<option value="${schema}">${schema}</option>`;
+                }
+                document.getElementById('browse_schema').innerHTML = options;
+                document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+                clearJsonSchema();
+            });
+    }
+
+    function loadSqlServerTables() {
+        const db = document.getElementById('browse_database').value;
+        const schema = document.getElementById('browse_schema').value;
+        if (!db || !schema) {
+            document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+            clearJsonSchema();
+            return;
+        }
+        fetch(`/get_sqlserver_tables?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`)
+            .then(response => response.json())
+            .then(data => {
+                let options = '<option value="">Select table...</option>';
+                for (const tbl of data) {
+                    options += `<option value="${tbl}">${tbl}</option>`;
+                }
+                document.getElementById('browse_table').innerHTML = options;
+                clearJsonSchema();
+            });
+    }
+
+    function clearJsonSchema() {
+        document.getElementById('browse_json_schema').textContent = "";
+        document.getElementById('generateDDLBtn').disabled = true;
+        document.getElementById('bq_ddl_preview').style.display = 'none';
+        document.getElementById('bq_ddl_preview').querySelector('pre').textContent = "";
+        document.getElementById('bq_table_name_browse').value = "";
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        clearJsonSchema();
+        var browseTable = document.getElementById('browse_table');
+        var bqTableName = document.getElementById('bq_table_name_browse');
+        if (browseTable && bqTableName) {
+            browseTable.addEventListener('change', function() {
+                bqTableName.value = browseTable.value;
+            });
+        }
+        {% if active_tab == 'browse' and mysql_connected and database %}
+        loadMysqlTables();
+        {% elif active_tab == 'browse' and postgresql_connected and database %}
+        loadPostgresSchemas();
+        {% elif active_tab == 'browse' and sqlserver_connected and database %}
+        loadSqlServerSchemas();
+        {% endif %}
+        {% if active_tab == 'browse' %}
+        var browseTab = document.getElementById('browse-tab');
+        if (browseTab) {
+            var tab = new bootstrap.Tab(browseTab);
+            tab.show();
+        }
+        {% endif %}
+    });
+
+    function showToast(message, type="warning", timeout=4000) {
+        // Remove any existing custom toast
+        let oldToast = document.getElementById('customAlertToast');
+        if (oldToast) oldToast.remove();
+
+        // Find or create toast container (reuse the one in your template)
+        let toastContainer = document.querySelector('.toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.className = "toast-container position-fixed p-3";
+            toastContainer.style.zIndex = "1080";
+            toastContainer.style.top = "1rem";
+            toastContainer.style.right = "1rem";
+            toastContainer.style.left = "auto";
+            toastContainer.style.transform = "none";
+            document.body.appendChild(toastContainer);
+        }
+
+        // Use Bootstrap's color classes: success, danger, warning
+        let colorClass = "warning";
+        if (type === "success") colorClass = "success";
+        else if (type === "danger" || type === "error") colorClass = "danger";
+
+        // Create toast element
+        let toast = document.createElement('div');
+        toast.id = 'customAlertToast';
+        toast.className = `toast align-items-center text-bg-${colorClass} border-0`;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        `;
+        toastContainer.appendChild(toast);
+
+        // Show toast using Bootstrap
+        var bsToast = new bootstrap.Toast(toast, { delay: timeout });
+        bsToast.show();
+    }
+
+    function getSchemaFromBrowse() {
+        const dbSystem = "{{ db_system }}";
+        const db = document.getElementById('browse_database').value;
+        const tbl = document.getElementById('browse_table').value;
+        if (dbSystem === "postgresql") {
+            const schema = document.getElementById('browse_schema').value;
+            if (!db || !schema || !tbl) {
+                showToast("Please select database, schema, and table.", "warning", 4000);
+                return;
+            }
+            fetch(`/get_postgres_schema?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(tbl)}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
+                    document.getElementById('bq_table_name_browse').value = data.schema.table_name || '';
+                    document.getElementById('generateDDLBtn').disabled = false;
+                    document.getElementById('bq_ddl_preview').style.display = 'none';
+                });
+        } else if (dbSystem === "sqlserver") {
+            const schema = document.getElementById('browse_schema').value;
+            if (!db || !schema || !tbl) {
+                showToast("Please select database, schema, and table.", "warning", 4000);
+                return;
+            }
+            fetch(`/get_sqlserver_schema?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(tbl)}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
+                    document.getElementById('bq_table_name_browse').value = data.schema.table_name || '';
+                    document.getElementById('generateDDLBtn').disabled = false;
+                    document.getElementById('bq_ddl_preview').style.display = 'none';
+                });
+        } else {
+            // MySQL
+            if (!db || !tbl) {
+                showToast("Please select both database and table.", "warning", 4000);
+                return;
+            }
+            fetch(`/get_mysql_schema?database=${encodeURIComponent(db)}&table=${encodeURIComponent(tbl)}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('browse_json_schema').textContent = JSON.stringify(data.schema, null, 4);
+                    document.getElementById('bq_table_name_browse').value = data.schema.table_name || '';
+                    document.getElementById('generateDDLBtn').disabled = false;
+                    document.getElementById('bq_ddl_preview').style.display = 'none';
+                });
+        }
+    }
+
+    function generateDDLFromSchema() {
+        const schemaText = document.getElementById('browse_json_schema').textContent;
+        const bq_project_id = document.getElementById('bq_project_id_browse').value;
+        const bq_dataset_id = document.getElementById('bq_dataset_id_browse').value;
+        const bq_table_name = document.getElementById('bq_table_name_browse').value;
+        fetch('/generate_bq_ddl', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                schema: schemaText,
+                bq_project_id: bq_project_id,
+                bq_dataset_id: bq_dataset_id,
+                bq_table_name: bq_table_name
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('bq_ddl_preview').style.display = 'block';
+            document.getElementById('bq_ddl_preview').querySelector('pre').textContent = data.ddl;
+            // Optional: enable download
+            let blob = new Blob([data.ddl], {type: "text/sql"});
+            let url = URL.createObjectURL(blob);
+            let downloadBtn = document.getElementById('downloadDDLBtn');
+            downloadBtn.href = url;
+            downloadBtn.style.display = 'inline-block';
+        });
+    }
+
+    function updateBQTableNameFromJSON() {
+        try {
+            var jsonText = document.getElementById('json_schema').value;
+            var jsonObj = JSON.parse(jsonText);
+            if (jsonObj.table_name) {
+                document.getElementById('bq_table_name').value = jsonObj.table_name;
+            }
+        } catch (e) {
+            // Ignore parse errors
+        }
+    }
+
+    function updateBQTableNameFromDDL() {
+        var ddlText = document.getElementById('source_ddl').value;
+        var match = ddlText.match(/CREATE\s+TABLE\s+[`"]?(\w+)[`"]?/i);
+        if (match && match[1]) {
+            document.getElementById('bq_table_name').value = match[1];
+        }
+    }
+
+    // Optionally, call both on input
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('json_schema').addEventListener('input', updateBQTableNameFromJSON);
+        document.getElementById('source_ddl').addEventListener('input', updateBQTableNameFromDDL);
+        // Initial population
         updateBQTableNameFromJSON();
+        updateBQTableNameFromDDL();
+    });
+
+    function clearTextarea(id) {
+        document.getElementById(id).value = "";
+        if (id === "json_schema") {
+            updateBQTableNameFromJSON();
+        }
     }
-}
 
-function onDatabaseChange() {
-    const dbSystem = "{{ db_system }}";
-    const db = document.getElementById('browse_database').value;
-    document.getElementById('browse_schema').innerHTML = '<option value="">Select schema...</option>';
-    document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
-    clearJsonSchema();
-    if (!db) return;
-    fetch(`/get_schemas?db_system=${encodeURIComponent(dbSystem)}&database=${encodeURIComponent(db)}`)
-        .then(response => response.json())
-        .then(data => {
-            let options = '<option value="">Select schema...</option>';
-            for (const schema of data.schemas) {
-                options += `<option value="${schema}">${schema}</option>`;
-            }
-            document.getElementById('browse_schema').innerHTML = options;
-        });
-}
-
-function onSchemaChange() {
-    const dbSystem = "{{ db_system }}";
-    const db = document.getElementById('browse_database').value;
-    const schema = document.getElementById('browse_schema').value;
-    document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
-    clearJsonSchema();
-    if (!db || !schema) return;
-    let url = "";
-    if (dbSystem === "postgresql") {
-        url = `/get_postgres_tables?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`;
-    } else {
-        url = `/get_tables?db_system=${encodeURIComponent(dbSystem)}&database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`;
+    function onDatabaseChange() {
+        const dbSystem = "{{ db_system }}";
+        const db = document.getElementById('browse_database').value;
+        document.getElementById('browse_schema').innerHTML = '<option value="">Select schema...</option>';
+        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+        clearJsonSchema();
+        if (!db) return;
+        fetch(`/get_schemas?db_system=${encodeURIComponent(dbSystem)}&database=${encodeURIComponent(db)}`)
+            .then(response => response.json())
+            .then(data => {
+                let options = '<option value="">Select schema...</option>';
+                for (const schema of data.schemas) {
+                    options += `<option value="${schema}">${schema}</option>`;
+                }
+                document.getElementById('browse_schema').innerHTML = options;
+            });
     }
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            let options = '<option value="">Select table...</option>';
-            // For /get_postgres_tables, data is a list; for /get_tables, data.tables
-            let tables = data.tables || data;
-            for (const tbl of tables) {
-                options += `<option value="${tbl}">${tbl}</option>`;
-            }
-            document.getElementById('browse_table').innerHTML = options;
-        });
-}
 
-function clearConnectionForm() {
-    document.getElementById('sourceConnectionForm').reset();
-    fetch('/clear_connection', {method: 'POST'})
-        .then(() => {
-            // Switch to Manual tab
-            var manualTab = document.getElementById('manual-tab');
-            if (manualTab) {
-                var tab = new bootstrap.Tab(manualTab);
-                tab.show();
-            }
-            // Remove query params and reload page to clear any state
-            window.location.href = window.location.pathname + '?active_tab=manual';
-        });
-}
-
-setTimeout(function() {
-    var alert = document.querySelector('.alert');
-    if (alert) {
-        alert.classList.remove('show');
-        alert.classList.add('hide');
+    function onSchemaChange() {
+        const dbSystem = "{{ db_system }}";
+        const db = document.getElementById('browse_database').value;
+        const schema = document.getElementById('browse_schema').value;
+        document.getElementById('browse_table').innerHTML = '<option value="">Select table...</option>';
+        clearJsonSchema();
+        if (!db || !schema) return;
+        let url = "";
+        if (dbSystem === "postgresql") {
+            url = `/get_postgres_tables?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`;
+        } else {
+            url = `/get_tables?db_system=${encodeURIComponent(dbSystem)}&database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}`;
+        }
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                let options = '<option value="">Select table...</option>';
+                // For /get_postgres_tables, data is a list; for /get_tables, data.tables
+                let tables = data.tables || data;
+                for (const tbl of tables) {
+                    options += `<option value="${tbl}">${tbl}</option>`;
+                }
+                document.getElementById('browse_table').innerHTML = options;
+            });
     }
-}, 4000); // 4000 ms = 4 seconds
 
-function updateFormAction() {
-    var dbSystem = document.getElementById('db_system').value;
-    var form = document.getElementById('sourceConnectionForm');
-    if (dbSystem === "mysql") {
-        form.action = "/connect_mysql";
-    } else if (dbSystem === "postgresql") {
-        form.action = "/connect_postgres";
-    } else if (dbSystem === "sqlserver") {
-        form.action = "/connect_sqlserver";
-    } else {
-        form.action = "/connect";
+    function clearConnectionForm() {
+        document.getElementById('sourceConnectionForm').reset();
+        fetch('/clear_connection', {method: 'POST'})
+            .then(() => {
+                // Switch to Manual tab
+                var manualTab = document.getElementById('manual-tab');
+                if (manualTab) {
+                    var tab = new bootstrap.Tab(manualTab);
+                    tab.show();
+                }
+                // Remove query params and reload page to clear any state
+                window.location.href = window.location.pathname + '?active_tab=manual';
+            });
     }
-}
-</script>
+
+    setTimeout(function() {
+        var alert = document.querySelector('.alert');
+        if (alert) {
+            alert.classList.remove('show');
+            alert.classList.add('hide');
+        }
+    }, 4000); // 4000 ms = 4 seconds
+
+    function updateFormAction() {
+        var dbSystem = document.getElementById('db_system').value;
+        var form = document.getElementById('sourceConnectionForm');
+        if (dbSystem === "mysql") {
+            form.action = "/connect_mysql";
+        } else if (dbSystem === "postgresql") {
+            form.action = "/connect_postgres";
+        } else if (dbSystem === "sqlserver") {
+            form.action = "/connect_sqlserver";
+        } else {
+            form.action = "/connect";
+        }
+    }
+    </script>
 </body>
 </html>
