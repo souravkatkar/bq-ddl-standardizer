@@ -54,6 +54,11 @@ bq-ddl-standardizer/
 │   ├── renderer.py
 │   ├── mapping.py
 │   └── __init__.py
+├── routes/
+│   ├── mysql_routes.py
+│   ├── postgres_routes.py
+│   ├── sqlserver_routes.py
+│   └── __pycache__/
 ├── templates/
 │   └── index.html
 ├── Readme.md
@@ -78,6 +83,7 @@ bq-ddl-standardizer/
   - AJAX-based schema extraction and DDL generation.
   - Only one source system connection is active at a time.
   - "Clear" button resets source connection and UI.
+  - Modularized codebase with separate route files for each database system.
 
 - **Accessibility:**  
   - ARIA labels for form controls.
