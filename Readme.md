@@ -3,8 +3,9 @@
 A simple **Flask** web application that:
 
 * Accepts source-database details from a web form.
-* Allows browsing of MySQL, PostgreSQL, and SQL Server databases, schemas, and tables.
-* Extracts table schema from MySQL, PostgreSQL, and SQL Server sources.
+* Allows browsing of MySQL, PostgreSQL, SQL Server, and Oracle databases, schemas, and tables.
+* Extracts table schema from MySQL, PostgreSQL, SQL Server, and Oracle sources.
+* **Extracts column and table comments for all supported databases.**
 * Generates the equivalent **BigQuery CREATE TABLE DDL**.
 * Saves the generated SQL to a downloadable `.sql` file.
 
@@ -27,7 +28,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1   # (Windows PowerShell)
 
 # 2. Install dependencies
-pip install flask google-cloud-bigquery sqlalchemy mysql-connector-python psycopg2 pyodbc
+pip install flask google-cloud-bigquery sqlalchemy mysql-connector-python psycopg2 pyodbc oracledb
 
 # 3. Set the Flask app name (only needed once per terminal)
 set FLASK_APP=app.py
@@ -51,6 +52,7 @@ bq-ddl-standardizer/
 │   ├── mysql_conn.py
 │   ├── postgres_conn.py
 │   ├── sqlserver_conn.py
+│   ├── oracle_conn.py
 │   ├── renderer.py
 │   ├── mapping.py
 │   └── __init__.py
@@ -58,6 +60,7 @@ bq-ddl-standardizer/
 │   ├── mysql_routes.py
 │   ├── postgres_routes.py
 │   ├── sqlserver_routes.py
+│   ├── oracle_routes.py
 │   └── __pycache__/
 ├── static/
 │   └── js/
@@ -72,9 +75,12 @@ bq-ddl-standardizer/
 ## Features
 
 - **Source System Support:**  
-  - Connect to MySQL, PostgreSQL, or SQL Server (one at a time).
+  - Connect to MySQL, PostgreSQL, SQL Server, or Oracle (one at a time).
   - Browse databases, schemas, and tables.
   - Extract schema from JSON or source DDL.
+
+- **Schema Extraction:**  
+  - Extracts column and table comments for all supported databases (MySQL, PostgreSQL, SQL Server, Oracle).
 
 - **BigQuery DDL Generation:**  
   - Preview and edit extracted schema.
@@ -99,7 +105,6 @@ bq-ddl-standardizer/
 ## Future Scope
 
 - **Support for Additional Source Systems:**
-  - Oracle
   - Snowflake
   - Other popular RDBMS and cloud data warehouses
 
