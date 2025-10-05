@@ -4,5 +4,5 @@ __pycache__/
 out/
 instance/
 .env
-models/*
-!models/.gitkeep
+models/**
+!models/README.md
