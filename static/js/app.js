@@ -347,6 +347,21 @@ function generateDDLFromSchema() {
     });
 }
 
+function updateDownloadDDLBtn(ddl, btnId = "downloadDDLBtnManual") {
+    const downloadBtn = document.getElementById(btnId);
+    if (downloadBtn) {
+        const blob = new Blob([ddl], { type: "text/sql" });
+        const url = URL.createObjectURL(blob);
+        downloadBtn.href = url;
+        downloadBtn.download = "bigquery_ddl.sql";
+        downloadBtn.style.display = "";
+    }
+}
+
+// Example usage after manual DDL generation:
+document.querySelector('#bq_ddl_preview_manual pre').textContent = generatedDDL;
+updateDownloadDDLBtn(generatedDDL, "downloadDDLBtnManual");
+
 function updateBQTableNameFromJSON() {
     try {
         var jsonText = document.getElementById('json_schema').value;

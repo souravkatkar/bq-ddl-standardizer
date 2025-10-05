@@ -248,7 +248,7 @@
                             <div class="row mt-3">
                                 <div class="col-md-4">
                                     <label for="bq_project_id" class="form-label">BigQuery Project ID</label>
-                                    <input type="text" class="form-control" id="bq_project_id" name="bq_project_id" placeholder="Enter BigQuery Project ID" value="my-bq-project">
+                                    <input type="text" class="form-control" id="bq_project_id" name="bq_project_id" placeholder="Enter BigQuery Project ID" value="MyBigQueryProject">
                                 </div>
                                 <div class="col-md-4">
                                     <label for="bq_dataset_id" class="form-label">BigQuery Dataset ID</label>
@@ -374,7 +374,7 @@
                             <div class="row mt-3">
                                 <div class="col-md-4">
                                     <label for="bq_project_id_browse" class="form-label">BigQuery Project ID</label>
-                                    <input type="text" class="form-control" id="bq_project_id_browse" name="bq_project_id" placeholder="Enter BigQuery Project ID" value="my-bq-project" {% if not_connected %}disabled{% endif %}>
+                                    <input type="text" class="form-control" id="bq_project_id_browse" name="bq_project_id" placeholder="Enter BigQuery Project ID" value="MyBigQueryProject" {% if not_connected %}disabled{% endif %}>
                                 </div>
                                 <div class="col-md-4">
                                     <label for="bq_dataset_id_browse" class="form-label">BigQuery Dataset ID</label>
@@ -395,7 +395,7 @@
                             <h5>Preview: Generated BigQuery DDL</h5>
                             <pre style="background:#f8f9fa; border:1px solid #dee2e6; padding:1em;"></pre>
                             <div class="btn-row">
-                                <a href="#" class="btn btn-primary mt-2" id="downloadDDLBtn" style="display:none;" download>Download SQL file</a>
+                                <a id="downloadDDLBtn" href="#" class="btn btn-primary mt-2" style="display:none;" download="bigquery_ddl.sql">Download SQL file</a>
                                 <button type="button" class="btn btn-secondary mt-2" id="standardizeDDLBtn" disabled>Standardize DDL</button>
                                 <button type="button" class="btn btn-secondary mt-2" id="addCommentsDDLBtn" disabled>Add Comments to DDL</button>
                             </div>
@@ -403,6 +403,12 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+    <div id="gpt-loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(255,255,255,0.7); z-index:2000; align-items:center; justify-content:center;">
+        <div style="text-align:center;">
+            <div class="spinner-border text-primary" style="width:3rem; height:3rem;" role="status"></div>
+            <div style="margin-top:1rem; font-size:1.2rem; color:#0d6efd;">Processing with AI...</div>
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

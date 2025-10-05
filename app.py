@@ -150,7 +150,7 @@ def generate():
     debug_log("POST /generate route called")
     json_schema_text = request.form.get('json_schema', '').strip()
     source_ddl_text = request.form.get('source_ddl', '').strip()
-    bq_project_id = request.form.get('bq_project_id', '')
+    bq_project_id = request.form.get('bq_project_id', 'MyBigQueryProject')
     bq_dataset_id = request.form.get('bq_dataset_id', '')
     bq_table_name = request.form.get('bq_table_name', '')
     ddl = None
@@ -288,6 +288,7 @@ def clear_connection():
 def generate_bq_ddl_route():
     debug_log("POST /generate_bq_ddl route called")
     data = request.get_json()
+    print("Data :",data)
     schema = json.loads(data.get('schema'))
     bq_project_id = data.get('bq_project_id')
     bq_dataset_id = data.get('bq_dataset_id')
